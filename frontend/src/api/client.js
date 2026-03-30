@@ -1,9 +1,11 @@
 import axios from 'axios';
 
-// Em produção (Vercel), VITE_API_URL aponta para o backend no Railway.
-// Em desenvolvimento, fica vazio e o proxy do Vite resolve para localhost:3001.
+// Em produção (Vercel), VITE_API_URL é a URL completa do backend Railway + /api.
+// Em desenvolvimento, usa /api e o proxy do Vite resolve para localhost:3001.
+const baseURL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || ''}/api`,
+  baseURL,
   headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
 });
