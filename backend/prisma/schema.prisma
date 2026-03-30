@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Nota: SQLite não suporta enums no Prisma.
+// Valores válidos são documentados como comentários e validados na camada de negócio.
+
+// ─────────────────────────────────────────
+// PESSOA  (dados pessoais completos)
+// ─────────────────────────────────────────
+
+model Pessoa {
+  id              Int      @id @default(autoincrement())
+  nome            String
+  dataNascimento  DateTime?
+  cpf             String?  @unique
+  rg              String?
+  orgaoEmissor    String?
+  dataEmissao     DateTime?
+  telefone        String?
+  email           String?
+  endereco        String?
+  cep             String?
+  cidade          String?
+  estado          String?
+  naturalidade    String?
+  estadoCivil     String?  // SOLTEIRO | CASADO | VIUVO | DIVORCIADO | UNIAO_ESTAVEL
+  origemReligiosa String?
+  nacionalidade   String?
+  grauInstrucao   String?
+  sexo            String?  // M | F
+  profissao       String?
+  tituloEleitor   String?
+  zona            String?
+  secao           String?
+  reservista      String?
+  tipoSanguineo   String?
+  nomePai         String?
+  nomeMae         String?
+  nomeConjuge     String?
+  foto            String?  // path relativo: uploads/missionarios/arquivo.jpg
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  missionario     Missionario?
+  promotor        PromotorMissoes?
+  agente          AgenteMissoes?
+  secretario      SecretarioMissoes?
+  dependentes     Dependente[]
+}
+
+// ─────────────────────────────────────────
+// MISSIONÁRIO
+// ─────────────────────────────────────────
+
+model Missionario {
+  id                Int             @id @default(autoincrement())
+  pessoaId          Int             @unique
+  pessoa            Pessoa          @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  campoMissionario  String
+  dataEnvio         DateTime
+  status            String          @default("ATIVO")  // ATIVO | INATIVO | AFASTADO
+  coordenadorId     Int?
+  coordenador       Missionario?    @relation("Supervisao", fields: [coordenadorId], references: [id])
+  supervisionados   Missionario[]   @relation("Supervisao")
+  baseMissionariaId Int?
+  baseMissionaria   BaseMissionaria? @relation(fields: [baseMissionariaId], references: [id])
+  dependentes       Dependente[]
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+// ─────────────────────────────────────────
+// DEPENDENTE
+// ─────────────────────────────────────────
+
+model Dependente {
+  id            Int         @id @default(autoincrement())
+  missionarioId Int
+  missionario   Missionario @relation(fields: [missionarioId], references: [id], onDelete: Cascade)
+  pessoaId      Int
+  pessoa        Pessoa      @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  parentesco    String      // CONJUGE | FILHO | FILHA | OUTRO
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+// ─────────────────────────────────────────
+// BASE MISSIONÁRIA
+// ─────────────────────────────────────────
+
+model BaseMissionaria {
+  id              Int           @id @default(autoincrement())
+  nome            String
+  endereco        String?
+  cidade          String?
+  estado          String?
+  telefone        String?
+  email           String?
+  descricao       String?
+  responsavelNome String?
+  missionarios    Missionario[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// ─────────────────────────────────────────
+// SETOR
+// ─────────────────────────────────────────
+
+model Setor {
+  id            Int                 @id @default(autoincrement())
+  nome          String              @unique
+  tipo          String              // CAPITAL | INTERIOR
+  congregacoes  Congregacao[]
+  promotores    PromotorMissoes[]
+  agentes       AgenteMissoes[]
+  secretarios   SecretarioMissoes[]
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+}
+
+// ─────────────────────────────────────────
+// CONGREGAÇÃO
+// ─────────────────────────────────────────
+
+model Congregacao {
+  id       Int                 @id @default(autoincrement())
+  nome     String
+  setorId  Int?
+  setor    Setor?              @relation(fields: [setorId], references: [id])
+  cidade   String?
+  pastor   String?
+  tipo     String              // CAPITAL | INTERIOR
+  agentes  AgenteMissoes[]
+  ofertas  OfertaMissionaria[]
+
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@unique([nome, setorId])
+}
+
+// ─────────────────────────────────────────
+// PROMOTOR DE MISSÕES
+// ─────────────────────────────────────────
+
+model PromotorMissoes {
+  id         Int      @id @default(autoincrement())
+  pessoaId   Int      @unique
+  pessoa     Pessoa   @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  setorId    Int
+  setor      Setor    @relation(fields: [setorId], references: [id])
+  dataInicio DateTime?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
+// AGENTE DE MISSÕES
+// ─────────────────────────────────────────
+
+model AgenteMissoes {
+  id            Int          @id @default(autoincrement())
+  pessoaId      Int          @unique
+  pessoa        Pessoa       @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  setorId       Int
+  setor         Setor        @relation(fields: [setorId], references: [id])
+  congregacaoId Int?
+  congregacao   Congregacao? @relation(fields: [congregacaoId], references: [id])
+  dataInicio    DateTime?
+
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+// ─────────────────────────────────────────
+// SECRETÁRIO DE MISSÕES
+// ─────────────────────────────────────────
+
+model SecretarioMissoes {
+  id         Int      @id @default(autoincrement())
+  pessoaId   Int      @unique
+  pessoa     Pessoa   @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  setorId    Int
+  setor      Setor    @relation(fields: [setorId], references: [id])
+  dataInicio DateTime?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─────────────────────────────────────────
+// OFERTA MISSIONÁRIA
+// ─────────────────────────────────────────
+
+model OfertaMissionaria {
+  id             Int         @id @default(autoincrement())
+  congregacaoId  Int
+  congregacao    Congregacao @relation(fields: [congregacaoId], references: [id])
+  mesReferencia  Int         // 1–12
+  anoReferencia  Int
+  valor          Decimal
+  dataLancamento DateTime    @default(now())
+  observacao     String?
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([congregacaoId, mesReferencia, anoReferencia])
+  @@index([anoReferencia, mesReferencia])
+}
+
+model EntradaAnual {
+  id         Int      @id @default(autoincrement())
+  ano        Int      @unique
+  valor      Decimal
+  observacao String?
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}

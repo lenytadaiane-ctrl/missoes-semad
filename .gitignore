@@ -1,0 +1,9 @@
+node_modules/
+.env
+*.db
+*.db-journal
+dist/
+uploads/missionarios/*.jpg
+uploads/missionarios/*.jpeg
+uploads/missionarios/*.png
+uploads/missionarios/*.webp
