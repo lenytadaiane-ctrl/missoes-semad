@@ -3,7 +3,7 @@ const app = require('./src/app');
 
 const PORT = process.env.PORT || 3001;
 
-app.listen(PORT, () => {
-  console.log(`\n🚀 Servidor rodando em http://localhost:${PORT}`);
-  console.log(`📂 Arquivos estáticos em http://localhost:${PORT}/uploads\n`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`📂 Arquivos estáticos em /uploads\n`);
 });
