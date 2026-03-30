@@ -34,4 +34,6 @@ RUN mkdir -p uploads
 EXPOSE 3001
 
 # Sincroniza o schema com o banco Postgres e inicia o servidor
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node server.js"]
+# Usa db push pois não há migration files — para usar migrate deploy,
+# gere as migrations localmente contra um Postgres: prisma migrate dev --name init
+CMD ["sh", "-c", "npx prisma db push && node server.js"]
