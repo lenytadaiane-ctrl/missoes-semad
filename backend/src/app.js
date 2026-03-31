@@ -8,11 +8,19 @@ const app = express();
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
+  'https://missoes-semad.vercel.app',
+  'https://missoes-semad-production.up.railway.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || /^https:\/\/.*\.vercel\.app$/.test(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
