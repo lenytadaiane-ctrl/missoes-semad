@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { ofertasApi } from '../../api/ofertas';
@@ -102,6 +103,8 @@ function OfertaForm({ inicial, onClose }) {
 }
 
 export default function OfertasList() {
+  const { role } = useAuth();
+  const isMaster = role === 'MASTER';
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [filtros, setFiltros] = useState({ mes: mesAtual, ano: anoAtual, tipo: '' });
@@ -174,7 +177,7 @@ export default function OfertasList() {
       <PageHeader
         title="Ofertas Missionárias"
         subtitle={`${lista.length} registros — Total: ${formatarMoeda(soma)}`}
-        actions={<button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Nova Oferta</button>}
+        actions={isMaster ? <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Nova Oferta</button> : null}
       />
 
       <div className="flex flex-wrap gap-3 mb-4">
@@ -245,10 +248,12 @@ export default function OfertasList() {
                   <td className="px-4 py-3 font-semibold text-emerald-700">{formatarMoeda(row.valor)}</td>
                   <td className="px-4 py-3 text-gray-500">{row.observacao || <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3">
-                    <div className="flex gap-2 justify-end">
-                      <button onClick={() => setModal({ mode: 'edit', item: row })} className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50">Editar</button>
-                      <button onClick={() => setConfirm(row)} className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Excluir</button>
-                    </div>
+                    {isMaster && (
+                      <div className="flex gap-2 justify-end">
+                        <button onClick={() => setModal({ mode: 'edit', item: row })} className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50">Editar</button>
+                        <button onClick={() => setConfirm(row)} className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Excluir</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))

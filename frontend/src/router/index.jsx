@@ -1,10 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
-
-// Pages — serão implementadas nas próximas etapas
-// Lazy imports para melhor performance
+import { useAuth } from '../contexts/AuthContext';
 import { lazy, Suspense } from 'react';
 
+const Login                 = lazy(() => import('../pages/Login'));
 const Dashboard             = lazy(() => import('../pages/Dashboard'));
 const MissionariosList      = lazy(() => import('../pages/missionarios/MissionariosList'));
 const MissionariosForm      = lazy(() => import('../pages/missionarios/MissionariosForm'));
@@ -37,11 +36,19 @@ function PageLoader() {
   );
 }
 
+function ProtectedRoute() {
+  const { token } = useAuth();
+  if (!token) return <Navigate to="/login" replace />;
+  return <MainLayout />;
+}
+
 export default function AppRouter() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
-        <Route element={<MainLayout />}>
+        <Route path="/login" element={<Login />} />
+
+        <Route element={<ProtectedRoute />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
 

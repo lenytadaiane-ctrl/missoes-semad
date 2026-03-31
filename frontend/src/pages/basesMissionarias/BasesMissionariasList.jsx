@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { basesApi } from '../../api/basesMissionarias';
@@ -63,6 +64,8 @@ function BaseForm({ inicial, onClose }) {
 }
 
 export default function BasesMissionariasList() {
+  const { role } = useAuth();
+  const isMaster = role === 'MASTER';
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -82,16 +85,16 @@ export default function BasesMissionariasList() {
     { key: 'estado', label: 'Estado' },
     { key: 'responsavelNome', label: 'Responsável' },
     { key: 'telefone', label: 'Telefone' },
-    { key: 'id', label: '', render: (_, row) => (
+    { key: 'id', label: '', render: (_, row) => isMaster ? (
       <div className="flex gap-2 justify-end">
         <button onClick={() => setModal({ mode: 'edit', item: row })} className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50">Editar</button>
         <button onClick={() => setConfirm(row)} className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Excluir</button>
       </div>
-    )},
+    ) : null },
   ];
   return (
     <div>
-      <PageHeader title="Bases Missionárias" actions={<button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Nova Base</button>} />
+      <PageHeader title="Bases Missionárias" actions={isMaster ? <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Nova Base</button> : null} />
       <div className="mb-4"><SearchInput value={search} onChange={setSearch} placeholder="Buscar base..." className="max-w-xs" /></div>
       <Table columns={columns} data={data} loading={isLoading} emptyMessage="Nenhuma base cadastrada." />
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Editar Base' : 'Nova Base'}>

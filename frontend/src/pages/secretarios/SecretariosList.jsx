@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { secretariosApi } from '../../api/secretarios';
@@ -45,6 +46,8 @@ function SecretarioForm({ inicial, onClose }) {
 }
 
 export default function SecretariosList() {
+  const { role } = useAuth();
+  const isMaster = role === 'MASTER';
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -62,16 +65,16 @@ export default function SecretariosList() {
     { key: 'pessoa.telefone', label: 'Telefone' },
     { key: 'pessoa.email', label: 'E-mail' },
     { key: 'dataInicio', label: 'Início', render: (v) => formatarData(v) },
-    { key: 'id', label: '', render: (_, row) => (
+    { key: 'id', label: '', render: (_, row) => isMaster ? (
       <div className="flex gap-2 justify-end">
         <button onClick={() => setModal({ mode: 'edit', item: row })} className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50">Editar</button>
         <button onClick={() => setConfirm(row)} className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Excluir</button>
       </div>
-    )},
+    ) : null },
   ];
   return (
     <div>
-      <PageHeader title="Secretários de Missões" subtitle={`${data.length} registros`} actions={<button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Novo Secretário</button>} />
+      <PageHeader title="Secretários de Missões" subtitle={`${data.length} registros`} actions={isMaster ? <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Novo Secretário</button> : null} />
       <div className="mb-4"><SearchInput value={search} onChange={setSearch} placeholder="Buscar secretário..." className="max-w-xs" /></div>
       <Table columns={columns} data={filtered} loading={isLoading} emptyMessage="Nenhum secretário cadastrado." />
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Editar Secretário' : 'Novo Secretário'}>

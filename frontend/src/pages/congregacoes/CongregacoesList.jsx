@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { congregacoesApi } from '../../api/congregacoes';
@@ -60,6 +61,8 @@ function CongregacaoForm({ inicial, onClose }) {
 }
 
 export default function CongregacoesList() {
+  const { role } = useAuth();
+  const isMaster = role === 'MASTER';
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -80,16 +83,16 @@ export default function CongregacoesList() {
     { key: 'tipo', label: 'Tipo', render: (v) => <TipoLocalBadge tipo={v} /> },
     { key: 'cidade', label: 'Cidade' },
     { key: 'pastor', label: 'Pastor' },
-    { key: 'id', label: '', render: (_, row) => (
+    { key: 'id', label: '', render: (_, row) => isMaster ? (
       <div className="flex gap-2 justify-end">
         <button onClick={() => setModal({ mode: 'edit', item: { ...row, setorId: row.setorId || '' } })} className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50">Editar</button>
         <button onClick={() => setConfirm(row)} className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Excluir</button>
       </div>
-    )},
+    ) : null },
   ];
   return (
     <div>
-      <PageHeader title="Congregações" subtitle={`${data.length} registros`} actions={<button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Nova Congregação</button>} />
+      <PageHeader title="Congregações" subtitle={`${data.length} registros`} actions={isMaster ? <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Nova Congregação</button> : null} />
       <div className="flex gap-3 mb-4">
         <SearchInput value={search} onChange={setSearch} placeholder="Buscar..." className="flex-1 max-w-xs" />
         <select value={tipoFiltro} onChange={(e) => setTipoFiltro(e.target.value)} className="input w-36">

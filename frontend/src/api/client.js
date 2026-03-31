@@ -10,6 +10,20 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// Interceptor de requisição — injeta o token JWT
+api.interceptors.request.use((config) => {
+  try {
+    const stored = localStorage.getItem('semad_auth');
+    if (stored) {
+      const { token } = JSON.parse(stored);
+      if (token) config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // ignora erros de parse
+  }
+  return config;
+});
+
 // Interceptor de resposta para tratar erros globalmente
 api.interceptors.response.use(
   (response) => response,

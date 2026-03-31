@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { agentesApi } from '../../api/agentes';
@@ -57,6 +58,8 @@ function AgenteForm({ inicial, onClose }) {
 }
 
 export default function AgentesList() {
+  const { role } = useAuth();
+  const isMaster = role === 'MASTER';
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [search, setSearch] = useState('');
@@ -74,16 +77,16 @@ export default function AgentesList() {
     { key: 'congregacao.nome', label: 'Congregação' },
     { key: 'pessoa.telefone', label: 'Telefone' },
     { key: 'pessoa.email', label: 'E-mail' },
-    { key: 'id', label: '', render: (_, row) => (
+    { key: 'id', label: '', render: (_, row) => isMaster ? (
       <div className="flex gap-2 justify-end">
         <button onClick={() => setModal({ mode: 'edit', item: row })} className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50">Editar</button>
         <button onClick={() => setConfirm(row)} className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Excluir</button>
       </div>
-    )},
+    ) : null },
   ];
   return (
     <div>
-      <PageHeader title="Agentes de Missões" subtitle={`${data.length} registros`} actions={<button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Novo Agente</button>} />
+      <PageHeader title="Agentes de Missões" subtitle={`${data.length} registros`} actions={isMaster ? <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Novo Agente</button> : null} />
       <div className="mb-4"><SearchInput value={search} onChange={setSearch} placeholder="Buscar agente..." className="max-w-xs" /></div>
       <Table columns={columns} data={filtered} loading={isLoading} emptyMessage="Nenhum agente cadastrado." />
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Editar Agente' : 'Novo Agente'}>

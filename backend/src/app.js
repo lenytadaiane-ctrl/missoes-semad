@@ -49,6 +49,10 @@ app.use((req, res, next) => {
 // ── Arquivos estáticos (fotos de missionários) ───────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
+// ── Autenticação ──────────────────────────────────────────────────────────────
+app.use('/api/auth', require('./routes/authRoutes'));
+app.use(require('./middlewares/authMiddleware'));
+
 // ── Rotas da API ─────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', message: 'API SEMAD-IEADMS', timestamp: new Date().toISOString() });

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
 import { setoresApi } from '../../api/setores';
@@ -40,6 +41,8 @@ function SetorForm({ inicial, onClose }) {
 }
 
 export default function SetoresList() {
+  const { role } = useAuth();
+  const isMaster = role === 'MASTER';
   const [modal, setModal] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const qc = useQueryClient();
@@ -55,16 +58,16 @@ export default function SetoresList() {
     { key: '_count.congregacoes', label: 'Congregações' },
     { key: '_count.secretarios', label: 'Secretários' },
     { key: '_count.promotores', label: 'Promotores' },
-    { key: 'id', label: '', render: (_, row) => (
+    { key: 'id', label: '', render: (_, row) => isMaster ? (
       <div className="flex gap-2 justify-end">
         <button onClick={() => setModal({ mode: 'edit', setor: row })} className="text-blue-600 hover:text-blue-800 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50">Editar</button>
         <button onClick={() => setConfirm(row)} className="text-red-500 hover:text-red-700 text-xs font-medium px-2 py-1 rounded hover:bg-red-50">Excluir</button>
       </div>
-    )},
+    ) : null },
   ];
   return (
     <div>
-      <PageHeader title="Setores" subtitle="Setores de missões" actions={<button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Novo Setor</button>} />
+      <PageHeader title="Setores" subtitle="Setores de missões" actions={isMaster ? <button onClick={() => setModal({ mode: 'create' })} className="btn-primary">+ Novo Setor</button> : null} />
       <Table columns={columns} data={data} loading={isLoading} emptyMessage="Nenhum setor cadastrado." />
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.mode === 'edit' ? 'Editar Setor' : 'Novo Setor'} size="sm">
         {modal && <SetorForm inicial={modal.setor} onClose={() => setModal(null)} />}
