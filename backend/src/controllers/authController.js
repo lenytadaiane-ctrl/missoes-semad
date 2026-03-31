@@ -3,9 +3,6 @@ const jwt = require('jsonwebtoken');
 exports.login = (req, res) => {
   const { usuario, senha } = req.body;
 
-  console.log('[auth debug] USUARIO_MASTER:', JSON.stringify(process.env.USUARIO_MASTER));
-  console.log('[auth debug] usuario recebido:', JSON.stringify(usuario));
-
   if (!usuario || !senha) {
     return res.status(400).json({ error: 'Usuário e senha são obrigatórios' });
   }
