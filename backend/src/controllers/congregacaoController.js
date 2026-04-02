@@ -45,7 +45,7 @@ async function criar(req, res, next) {
         tipo,
         cidade: cidade?.trim() || null,
         pastor: pastor?.trim() || null,
-        setorId: setorId ? parseInt(setorId) : null,
+        setor: { connect: { id: parseInt(setorId) } },
       },
       include: { setor: true },
     });
