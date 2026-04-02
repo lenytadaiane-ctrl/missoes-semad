@@ -28,19 +28,38 @@ async function buscarPorId(req, res, next) {
 async function criar(req, res, next) {
   try {
     const { nome, telefone, email, setorId, dataInicio } = req.body;
+    
+    // Validações básicas
     if (!nome)    return res.status(400).json({ error: 'Nome é obrigatório.' });
     if (!setorId) return res.status(400).json({ error: 'setorId é obrigatório.' });
 
     const reg = await prisma.secretarioMissoes.create({
       data: {
-        setorId:    parseInt(setorId),
+        // CORREÇÃO: Em vez de setorId direto, usamos o 'connect'
+        setor: {
+          connect: { id: parseInt(setorId) }
+        },
+        // O campo no banco parece ser 'dataInício' (com acento) ou 'dataInicio'. 
+        // Verifique no seu schema. Se o erro persistir, tente mudar para dataInício.
         dataInicio: dataInicio ? new Date(dataInicio) : null,
-        pessoa: { create: { nome: nome.trim(), telefone: telefone || null, email: email || null } },
+        
+        // Criação da pessoa vinculada
+        pessoa: { 
+          create: { 
+            nome: nome.trim(), 
+            telefone: telefone || null, 
+            email: email || null 
+          } 
+        },
       },
-      include: INCLUDE,
+      include: INCLUDE, // Mantém o seu include original
     });
+
     res.status(201).json(toJSON(reg));
-  } catch (err) { next(err); }
+  } catch (err) { 
+    console.error("Erro ao criar secretário:", err);
+    next(err); 
+  }
 }
 
 async function atualizar(req, res, next) {
