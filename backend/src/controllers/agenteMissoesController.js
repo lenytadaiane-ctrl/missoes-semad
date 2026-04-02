@@ -37,7 +37,7 @@ async function criar(req, res, next) {
     const reg = await prisma.agenteMissoes.create({
       data: {
         setor: { connect: { id: parseInt(setorId) } },
-        congregacaoId: congregacaoId ? parseInt(congregacaoId) : null,
+        congregacao: { connect: { id: parseInt(id) } },
         dataInicio:    dataInicio ? new Date(dataInicio) : null,
         pessoa: { create: { nome: nome.trim(), telefone: telefone || null, email: email || null } },
       },
