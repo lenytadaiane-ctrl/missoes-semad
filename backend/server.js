@@ -5,10 +5,12 @@ const path = require('path');
 const PORT = process.env.PORT || 3001;
 
 async function startServer() {
+  console.log('[server] iniciando...');
   if (process.env.NODE_ENV === 'production') {
     const { PrismaClient } = require('@prisma/client');
     const prisma = new PrismaClient();
     try {
+      console.log('[server] verificando banco...');
       const count = await prisma.setor.count();
       if (count === 0) {
         console.log('[auto-seed] Banco vazio — executando seed de producao...');
@@ -28,6 +30,7 @@ async function startServer() {
     }
   }
 
+  console.log('[server] subindo servidor na porta', PORT);
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`\nServidor rodando na porta ${PORT}`);
     console.log(`Arquivos estaticos em /uploads\n`);
