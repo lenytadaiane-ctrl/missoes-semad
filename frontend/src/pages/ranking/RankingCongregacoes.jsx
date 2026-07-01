@@ -78,6 +78,7 @@ export default function RankingCongregacoes() {
           <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={ano} onChange={e => setAno(e.target.value)}>
             {anos.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
+          <button onClick={() => window.print()} className="no-print border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">Imprimir</button>
         </div>
       </div>
 

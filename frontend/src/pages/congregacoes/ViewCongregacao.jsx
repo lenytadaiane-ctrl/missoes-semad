@@ -32,7 +32,8 @@ export default function ViewCongregacao() {
           <h1 className="text-2xl font-bold text-gray-800">{c.nome}</h1>
           <Badge text={c.tipo} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 no-print">
+          <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
           <Link to={`/congregacoes/${id}`}><Button>Editar</Button></Link>
           <Button variant="secondary" onClick={() => navigate('/congregacoes')}>Voltar</Button>
         </div>

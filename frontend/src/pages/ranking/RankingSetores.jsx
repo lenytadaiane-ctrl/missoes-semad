@@ -68,6 +68,7 @@ export default function RankingSetores() {
             <option value="">Ano todo</option>
             {MESES.slice(1).map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
           </select>
+          <button onClick={() => window.print()} className="no-print border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">Imprimir</button>
         </div>
       </div>
 

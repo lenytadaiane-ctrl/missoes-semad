@@ -35,6 +35,7 @@ const RelatorioBases = lazy(() => import('../pages/relatorios/RelatorioBases'));
 const RelatorioPromotores = lazy(() => import('../pages/relatorios/RelatorioPromotores'));
 const RelatorioSecretarios = lazy(() => import('../pages/relatorios/RelatorioSecretarios'));
 const RelatorioFinanceiro = lazy(() => import('../pages/relatorios/RelatorioFinanceiro'));
+const Configuracoes = lazy(() => import('../pages/configuracoes/Configuracoes'));
 
 function ProtectedRoute({ children }) {
   const { token } = useAuth();
@@ -89,6 +90,7 @@ export default function AppRouter() {
             <Route path="relatorios/promotores" element={<RelatorioPromotores />} />
             <Route path="relatorios/secretarios" element={<RelatorioSecretarios />} />
             <Route path="relatorios/financeiro" element={<RelatorioFinanceiro />} />
+            <Route path="configuracoes" element={<Configuracoes />} />
           </Route>
         </Routes>
       </Suspense>

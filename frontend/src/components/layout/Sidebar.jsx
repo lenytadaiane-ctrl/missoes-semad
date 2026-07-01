@@ -43,6 +43,10 @@ const navGroups = [
       { to: '/relatorios/financeiro', label: 'Financeiro', icon: '📄' },
     ],
   },
+  {
+    label: 'Sistema',
+    items: [{ to: '/configuracoes', label: 'Configurações', icon: '⚙️' }],
+  },
 ];
 
 export default function Sidebar({ open, onClose }) {

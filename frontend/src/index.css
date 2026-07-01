@@ -15,6 +15,34 @@
 }
 
 @media print {
+  /* Ocultar navegação e controles */
   .no-print { display: none !important; }
-  body { background: white; }
+  aside { display: none !important; }
+  header { display: none !important; }
+
+  /* Layout limpo para impressão */
+  body { background: white !important; font-size: 12px; }
+  main { padding: 0 !important; overflow: visible !important; }
+  #root > div { display: block !important; height: auto !important; overflow: visible !important; }
+
+  /* Tabelas */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #e5e7eb; padding: 6px 8px; }
+  thead { background: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Forçar cores de fundo e badges na impressão */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Fotos na impressão */
+  img { max-width: 100%; display: inline-block; }
+
+  /* Quebras de página */
+  .page-break { page-break-before: always; }
+  tr { page-break-inside: avoid; }
+
+  /* Remover sombras */
+  .shadow-sm, .shadow { box-shadow: none !important; }
+
+  /* Título da página como cabeçalho */
+  h1 { font-size: 16px !important; margin-bottom: 12px; }
 }

@@ -28,7 +28,8 @@ export default function ViewBase() {
     <div className="max-w-2xl space-y-5">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-800">{b.nome}</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 no-print">
+          <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
           <Link to={`/bases-missionarias/${id}`}><Button>Editar</Button></Link>
           <Button variant="secondary" onClick={() => navigate('/bases-missionarias')}>Voltar</Button>
         </div>

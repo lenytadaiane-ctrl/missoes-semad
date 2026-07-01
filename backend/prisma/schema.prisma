@@ -170,3 +170,11 @@ model EntradaAnual {
   valor      Decimal @db.Decimal(12, 2)
   observacao String?
 }
+
+model ConfiguracaoSistema {
+  id        Int      @id @default(autoincrement())
+  chave     String   @unique
+  label     String
+  itens     Json     @default("[]")
+  updatedAt DateTime @updatedAt
+}

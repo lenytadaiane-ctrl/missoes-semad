@@ -32,7 +32,8 @@ export default function ViewSetor() {
           <h1 className="text-2xl font-bold text-gray-800">{s.nome}</h1>
           <Badge text={s.tipo} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 no-print">
+          <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
           <Link to={`/setores/${id}`}><Button>Editar</Button></Link>
           <Button variant="secondary" onClick={() => navigate('/setores')}>Voltar</Button>
         </div>

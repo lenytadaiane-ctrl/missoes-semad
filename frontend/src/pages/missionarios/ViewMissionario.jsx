@@ -59,7 +59,8 @@ export default function ViewMissionario() {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 no-print">
+          <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
           <Link to={`/missionarios/${id}`}><Button>Editar</Button></Link>
           <Button variant="secondary" onClick={() => navigate('/missionarios')}>Voltar</Button>
         </div>

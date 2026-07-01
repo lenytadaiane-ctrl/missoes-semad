@@ -21,5 +21,6 @@ router.use('/secretarios-missoes', require('./secretarios'));
 router.use('/ofertas-missionarias', require('./ofertas'));
 router.use('/ranking', require('./ranking'));
 router.use('/relatorios', require('./relatorios'));
+router.use('/configuracoes', require('./configuracoes'));
 
 module.exports = router;
