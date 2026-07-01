@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Pessoa {
+  id              Int      @id @default(autoincrement())
+  nome            String
+  dataNascimento  DateTime?
+  cpf             String?  @unique
+  rg              String?
+  orgaoEmissor    String?
+  dataEmissao     DateTime?
+  telefone        String?
+  email           String?
+  endereco        String?
+  cep             String?
+  cidade          String?
+  estado          String?
+  naturalidade    String?
+  estadoCivil     String?
+  origemReligiosa String?
+  nacionalidade   String?
+  grauInstrucao   String?
+  sexo            String?
+  profissao       String?
+  tituloEleitor   String?
+  zona            String?
+  secao           String?
+  reservista      String?
+  tipoSanguineo   String?
+  nomePai         String?
+  nomeMae         String?
+  nomeConjuge     String?
+  foto            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  missionario  Missionario?
+  promotor     PromotorMissoes?
+  agente       AgenteMissoes?
+  secretario   SecretarioMissoes?
+  dependentes  Dependente[]
+}
+
+model Missionario {
+  id                Int      @id @default(autoincrement())
+  pessoaId          Int      @unique
+  campoMissionario  String?
+  dataEnvio         DateTime?
+  status            String   @default("ATIVO")
+  coordenadorId     Int?
+  baseMissionariaId Int?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  pessoa          Pessoa          @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  baseMissionaria BaseMissionaria? @relation(fields: [baseMissionariaId], references: [id])
+  coordenador     Missionario?    @relation("Supervisao", fields: [coordenadorId], references: [id])
+  supervisionados Missionario[]   @relation("Supervisao")
+  dependentes     Dependente[]
+}
+
+model Dependente {
+  id            Int    @id @default(autoincrement())
+  missionarioId Int
+  pessoaId      Int
+  parentesco    String
+
+  missionario Missionario @relation(fields: [missionarioId], references: [id], onDelete: Cascade)
+  pessoa      Pessoa      @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+}
+
+model BaseMissionaria {
+  id               Int    @id @default(autoincrement())
+  nome             String
+  endereco         String?
+  cidade           String?
+  estado           String?
+  telefone         String?
+  email            String?
+  descricao        String?
+  responsavelNome  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  missionarios Missionario[]
+}
+
+model Setor {
+  id   Int    @id @default(autoincrement())
+  nome String @unique
+  tipo String // CAPITAL | INTERIOR
+
+  congregacoes Congregacao[]
+  promotores   PromotorMissoes[]
+  agentes      AgenteMissoes[]
+  secretarios  SecretarioMissoes[]
+}
+
+model Congregacao {
+  id      Int    @id @default(autoincrement())
+  nome    String
+  setorId Int?
+  cidade  String?
+  pastor  String?
+  tipo    String // CAPITAL | INTERIOR
+
+  setor   Setor?            @relation(fields: [setorId], references: [id])
+  agentes AgenteMissoes[]
+  ofertas OfertaMissionaria[]
+
+  @@unique([nome, setorId])
+}
+
+model PromotorMissoes {
+  id         Int      @id @default(autoincrement())
+  pessoaId   Int      @unique
+  setorId    Int
+  dataInicio DateTime?
+
+  pessoa Pessoa @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  setor  Setor  @relation(fields: [setorId], references: [id])
+}
+
+model AgenteMissoes {
+  id            Int      @id @default(autoincrement())
+  pessoaId      Int      @unique
+  setorId       Int
+  congregacaoId Int?
+  dataInicio    DateTime?
+
+  pessoa      Pessoa       @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  setor       Setor        @relation(fields: [setorId], references: [id])
+  congregacao Congregacao? @relation(fields: [congregacaoId], references: [id])
+}
+
+model SecretarioMissoes {
+  id         Int      @id @default(autoincrement())
+  pessoaId   Int      @unique
+  setorId    Int
+  dataInicio DateTime?
+
+  pessoa Pessoa @relation(fields: [pessoaId], references: [id], onDelete: Cascade)
+  setor  Setor  @relation(fields: [setorId], references: [id])
+}
+
+model OfertaMissionaria {
+  id             Int      @id @default(autoincrement())
+  congregacaoId  Int
+  mesReferencia  Int
+  anoReferencia  Int
+  valor          Decimal  @db.Decimal(10, 2)
+  dataLancamento DateTime @default(now())
+  observacao     String?
+
+  congregacao Congregacao @relation(fields: [congregacaoId], references: [id])
+
+  @@unique([congregacaoId, mesReferencia, anoReferencia])
+  @@index([anoReferencia, mesReferencia])
+}
+
+model EntradaAnual {
+  id         Int     @id @default(autoincrement())
+  ano        Int     @unique
+  valor      Decimal @db.Decimal(12, 2)
+  observacao String?
+}
