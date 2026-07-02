@@ -9,4 +9,4 @@ COPY src ./src
 COPY server.js ./
 RUN mkdir -p uploads
 EXPOSE 3001
-CMD ["sh", "-c", "npx prisma db push && node server.js"]
+CMD ["node", "server.js"]
