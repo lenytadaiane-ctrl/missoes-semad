@@ -7,16 +7,16 @@ const routes = require('./routes');
 
 const app = express();
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:4173',
-  'https://missoes-semad.vercel.app',
-];
-
 app.use(cors({
   origin: (origin, callback) => {
+    // Permite sem origin (healthcheck, Postman, mobile) e qualquer origem em produção
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+    if (
+      /^http:\/\/localhost/.test(origin) ||
+      /\.netlify\.app$/.test(origin) ||
+      /\.vercel\.app$/.test(origin) ||
+      /\.railway\.app$/.test(origin)
+    ) {
       return callback(null, true);
     }
     callback(new Error('Not allowed by CORS'));
