@@ -272,10 +272,66 @@ function AbaEntradaAnual() {
   );
 }
 
+/* ─── ABA: BACKUP ─── */
+function AbaBackup() {
+  const [baixando, setBaixando] = useState(false);
+
+  async function baixarBackup() {
+    setBaixando(true);
+    try {
+      const res = await api.get('/backup/export', { responseType: 'blob' });
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `semad-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Backup baixado com sucesso!');
+    } catch {
+      toast.error('Erro ao gerar backup');
+    } finally {
+      setBaixando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4 max-w-xl">
+      <p className="text-sm text-gray-500">
+        Exporta todos os dados do sistema em um arquivo JSON. Guarde em local seguro — pode ser usado futuramente para restaurar o banco.
+      </p>
+
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col gap-4">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">💾</span>
+          <div>
+            <p className="font-semibold text-gray-800">Exportar backup completo</p>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Inclui setores, congregações, missionários, ofertas, configurações e entradas anuais.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={baixarBackup}
+          disabled={baixando}
+          className="self-start flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors"
+        >
+          {baixando ? <><Spinner size="sm" /> Gerando...</> : '⬇ Baixar Backup JSON'}
+        </button>
+      </div>
+
+      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+        <strong>Dica:</strong> Faça um backup antes de qualquer importação ou alteração em massa.
+        Guarde o arquivo com a data no nome para facilitar a identificação.
+      </div>
+    </div>
+  );
+}
+
 /* ─── PÁGINA PRINCIPAL ─── */
 const ABAS = [
   { id: 'listas', label: 'Listas do Sistema', desc: 'Dropdowns e opções dos formulários' },
   { id: 'entrada', label: 'Entrada Anual', desc: 'Totais anuais de arrecadação' },
+  { id: 'backup', label: '💾 Backup', desc: 'Exportar dados' },
 ];
 
 export default function Configuracoes() {
@@ -299,6 +355,7 @@ export default function Configuracoes() {
 
       {aba === 'listas' && <AbaListas />}
       {aba === 'entrada' && <AbaEntradaAnual />}
+      {aba === 'backup' && <AbaBackup />}
     </div>
   );
 }
