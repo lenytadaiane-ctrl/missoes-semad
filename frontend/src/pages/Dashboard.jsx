@@ -48,7 +48,7 @@ export default function Dashboard() {
   });
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
-  if (!data) return null;
+  if (!data || typeof data !== 'object') return <div className="flex justify-center py-20 text-gray-400">Carregando dados...</div>;
 
   const labelPeriodo = mes ? `${MESES_L[parseInt(mes)-1]}/${ano}` : `Ano ${ano}`;
   const crescimento = (data.crescimentoAnual || []).map(r => ({ name: String(r.ano), total: r.total, fonte: r.fonte }));
