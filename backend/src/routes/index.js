@@ -23,5 +23,6 @@ router.use('/ranking', require('./ranking'));
 router.use('/relatorios', require('./relatorios'));
 router.use('/configuracoes', require('./configuracoes'));
 router.use('/backup', require('./backup'));
+router.use('/missionarios/:missionarioId/acompanhamento', require('./acompanhamento'));
 
 module.exports = router;
