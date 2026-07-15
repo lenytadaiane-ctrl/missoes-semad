@@ -2,6 +2,9 @@
   command = "npm run build"
   publish = "dist"
 
+[context.dev]
+  command = "echo 'Branch dev: não faz deploy automático'"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
