@@ -15,6 +15,12 @@ async function exportarBackup(req, res) {
     ofertas,
     entradasAnuais,
     configuracoes,
+    interacoes,
+    relatorios,
+    campos,
+    marcos,
+    ajudas,
+    avaliacoes,
   ] = await Promise.all([
     prisma.setor.findMany({ orderBy: { nome: 'asc' } }),
     prisma.congregacao.findMany({ orderBy: { nome: 'asc' } }),
@@ -24,13 +30,19 @@ async function exportarBackup(req, res) {
     prisma.agenteMissoes.findMany(),
     prisma.secretarioMissoes.findMany(),
     prisma.promotorMissoes.findMany({ include: { setor: true } }),
-    prisma.ofertaMissionaria.findMany({ orderBy: [{ ano: 'desc' }, { mes: 'desc' }] }),
+    prisma.ofertaMissionaria.findMany({ orderBy: [{ anoReferencia: 'desc' }, { mesReferencia: 'desc' }] }),
     prisma.entradaAnual.findMany({ orderBy: { ano: 'asc' } }),
     prisma.configuracaoSistema.findMany(),
+    prisma.interacaoMissionario.findMany({ orderBy: { data: 'desc' } }),
+    prisma.relatorioMissionario.findMany({ orderBy: [{ anoRef: 'desc' }, { mesRef: 'desc' }] }),
+    prisma.campoMissionario.findMany(),
+    prisma.marcoMissao.findMany({ orderBy: { data: 'desc' } }),
+    prisma.ajudaEnviada.findMany({ orderBy: { data: 'desc' } }),
+    prisma.avaliacaoSemestral.findMany({ orderBy: [{ ano: 'desc' }, { semestre: 'desc' }] }),
   ]);
 
   const backup = {
-    versao: '1.0',
+    versao: '2.0',
     geradoEm: new Date().toISOString(),
     geradoPor: req.user?.usuario || 'desconhecido',
     dados: {
@@ -45,6 +57,13 @@ async function exportarBackup(req, res) {
       ofertas,
       entradasAnuais,
       configuracoes,
+      // Acompanhamento pastoral
+      interacoes,
+      relatorios,
+      campos,
+      marcos,
+      ajudas,
+      avaliacoes,
     },
   };
 

@@ -63,6 +63,14 @@ model Missionario {
   coordenador     Missionario?    @relation("Supervisao", fields: [coordenadorId], references: [id])
   supervisionados Missionario[]   @relation("Supervisao")
   dependentes     Dependente[]
+
+  // Acompanhamento pastoral
+  interacoes    InteracaoMissionario[]
+  relatorios    RelatorioMissionario[]
+  campo         CampoMissionario?
+  marcos        MarcoMissao[]
+  ajudas        AjudaEnviada[]
+  avaliacoes    AvaliacaoSemestral[]
 }
 
 model Dependente {
@@ -177,4 +185,111 @@ model ConfiguracaoSistema {
   label     String
   itens     Json     @default("[]")
   updatedAt DateTime @updatedAt
+}
+
+// ── Acompanhamento Pastoral ──────────────────────────────────────────────────
+
+model InteracaoMissionario {
+  id            Int      @id @default(autoincrement())
+  missionarioId Int
+  tipo          String   // VISITA_MATRIZ | LIGACAO | WHATSAPP | EMAIL | VISITA_CAMPO | ORACAO | OUTRO
+  data          DateTime
+  descricao     String
+  observacao    String?
+  arquivos      Json     @default("[]")
+  registradoPor String?
+  createdAt     DateTime @default(now())
+
+  missionario Missionario @relation(fields: [missionarioId], references: [id], onDelete: Cascade)
+
+  @@index([missionarioId, data])
+}
+
+model RelatorioMissionario {
+  id              Int       @id @default(autoincrement())
+  missionarioId   Int
+  tipo            String    // MENSAL | SEMESTRAL | ANUAL | ESPECIAL
+  mesRef          Int?
+  anoRef          Int
+  status          String    @default("PENDENTE") // PENDENTE | RECEBIDO | REVISADO
+  conteudo        String?
+  arquivo         String?
+  dataEnvio       DateTime?
+  dataRecebimento DateTime?
+  observacao      String?
+  createdAt       DateTime  @default(now())
+
+  missionario Missionario @relation(fields: [missionarioId], references: [id], onDelete: Cascade)
+
+  @@index([missionarioId, anoRef])
+}
+
+model CampoMissionario {
+  id                  Int      @id @default(autoincrement())
+  missionarioId       Int      @unique
+  pais                String?
+  cidade              String?
+  estado              String?
+  tipoArea            String?  // URBANA | RURAL | INDIGENA | QUILOMBOLA | OUTRO
+  tipoReunioes        String?  // CASA | SALAO | TEMPLO | AO_AR_LIVRE | MISTO
+  temTemplo           Boolean  @default(false)
+  capacidade          Int?
+  dataInicio          DateTime?
+  situacao            String   @default("ATIVO") // CRESCENDO | ESTAVEL | DIFICULDADES | PARADO
+  descricao           String?
+  publicosAtendidos   Json     @default("[]")   // ["CRIANCAS","ADOLESCENTES","ADULTOS","IDOSOS"]
+  qtdPessoas          Int?
+  updatedAt           DateTime @updatedAt
+
+  missionario Missionario  @relation(fields: [missionarioId], references: [id], onDelete: Cascade)
+  marcos      MarcoMissao[]
+}
+
+model MarcoMissao {
+  id            Int      @id @default(autoincrement())
+  missionarioId Int
+  campoId       Int?
+  data          DateTime
+  tipo          String   // TEMPLO | PONTO_PREGACAO | BATISMO | CELULA | OBRA | IMPACTO | OUTRO
+  titulo        String
+  descricao     String?
+  impacto       String?
+  createdAt     DateTime @default(now())
+
+  missionario Missionario       @relation(fields: [missionarioId], references: [id], onDelete: Cascade)
+  campo       CampoMissionario? @relation(fields: [campoId], references: [id])
+
+  @@index([missionarioId, data])
+}
+
+model AjudaEnviada {
+  id            Int      @id @default(autoincrement())
+  missionarioId Int
+  data          DateTime
+  tipo          String   // FINANCEIRA | MATERIAL | EQUIPAMENTO | OBRA | OUTRO
+  descricao     String
+  valor         Decimal? @db.Decimal(10, 2)
+  ofertaId      Int?
+  createdAt     DateTime @default(now())
+
+  missionario Missionario @relation(fields: [missionarioId], references: [id], onDelete: Cascade)
+
+  @@index([missionarioId])
+}
+
+model AvaliacaoSemestral {
+  id              Int      @id @default(autoincrement())
+  missionarioId   Int
+  semestre        Int      // 1 ou 2
+  ano             Int
+  situacaoCampo   String   // CRESCENDO | ESTAVEL | DIFICULDADES | PRECISA_APOIO | PARADO
+  avaliacaoGeral  String
+  proximosPassos  String?
+  avaliadoPor     String
+  createdAt       DateTime @default(now())
+
+  missionario Missionario @relation(fields: [missionarioId], references: [id], onDelete: Cascade)
+
+  @@unique([missionarioId, semestre, ano])
+  @@index([missionarioId])
 }
