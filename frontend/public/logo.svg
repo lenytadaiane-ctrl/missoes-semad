@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fundo círculo azul escuro -->
+  <circle cx="256" cy="256" r="256" fill="#1e3a8a"/>
+  <!-- Cruz branca (missões) -->
+  <rect x="228" y="100" width="56" height="312" rx="12" fill="white" opacity="0.95"/>
+  <rect x="100" y="228" width="312" height="56" rx="12" fill="white" opacity="0.95"/>
+  <!-- Letra S e M centralizadas (SEMAD) -->
+  <!-- círculo menor para o emblema interno -->
+  <circle cx="256" cy="256" r="72" fill="#1e3a8a" stroke="white" stroke-width="4" opacity="0.0"/>
+  <!-- Texto SEMAD abaixo -->
+  <text x="256" y="460" font-family="Arial, sans-serif" font-size="58" font-weight="bold"
+        fill="white" text-anchor="middle" letter-spacing="4">SEMAD</text>
+  <text x="256" y="510" font-family="Arial, sans-serif" font-size="22"
+        fill="#93c5fd" text-anchor="middle" letter-spacing="1">MISSÕES</text>
+</svg>
