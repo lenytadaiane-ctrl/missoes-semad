@@ -5,6 +5,13 @@ import { Toaster } from 'react-hot-toast';
 import App from './App';
 import './index.css';
 
+// Recarrega automaticamente quando o service worker é atualizado
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+}
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
