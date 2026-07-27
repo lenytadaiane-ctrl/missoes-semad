@@ -3,7 +3,7 @@
   publish = "dist"
 
 [build.environment]
-  VITE_API_URL = "https://missoes-semad-production.up.railway.app"
+  VITE_API_URL = "https://missoes-semad-production.up.railway.app/api"
 
 [context.dev]
   command = "echo 'Branch dev: não faz deploy automático'"
