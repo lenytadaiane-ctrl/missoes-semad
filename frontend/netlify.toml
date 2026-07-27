@@ -5,6 +5,14 @@
 [context.dev]
   command = "echo 'Branch dev: não faz deploy automático'"
 
+# Proxy /api/* → Railway backend (deve vir ANTES do redirect SPA)
+[[redirects]]
+  from = "/api/*"
+  to = "https://missoes-semad-production.up.railway.app/api/:splat"
+  status = 200
+  force = true
+
+# SPA fallback — todas as rotas do React
 [[redirects]]
   from = "/*"
   to = "/index.html"
