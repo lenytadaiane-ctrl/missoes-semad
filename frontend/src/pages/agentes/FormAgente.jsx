@@ -20,6 +20,7 @@ export default function FormAgente() {
     queryFn: () => api.get('/congregacoes', { params: { setorId: setorIdWatch } }).then(r => r.data),
     enabled: !!setorIdWatch,
   });
+  const { data: todasCongregacoes = [] } = useQuery({ queryKey: ['congregacoes-todas'], queryFn: () => api.get('/congregacoes').then(r => r.data) });
 
   const { data: record } = useQuery({
     queryKey: ['agente', id],
@@ -28,7 +29,7 @@ export default function FormAgente() {
   });
 
   useEffect(() => {
-    if (record) reset({ ...record.pessoa, setorId: record.setorId, congregacaoId: record.congregacaoId || '', dataInicio: record.dataInicio?.slice(0, 10) || '' });
+    if (record) reset({ ...record.pessoa, setorId: record.setorId, congregacaoId: record.congregacaoId || '', dataInicio: record.dataInicio?.slice(0, 10) || '', dataNascimento: record.pessoa?.dataNascimento?.slice(0, 10) || '', congregacaoOrigemId: record.pessoa?.congregacaoOrigemId || '' });
   }, [record, reset]);
 
   async function onSubmit(data) {
@@ -51,6 +52,7 @@ export default function FormAgente() {
           <Input label="Telefone" {...register('telefone')} />
           <Input label="E-mail" type="email" {...register('email')} />
           <Input label="CPF" {...register('cpf')} />
+          <Input label="Data de Nascimento" type="date" {...register('dataNascimento')} />
           <Input label="Data Início" type="date" {...register('dataInicio')} />
         </div>
         <div className="flex flex-col gap-1">
@@ -61,10 +63,17 @@ export default function FormAgente() {
           </select>
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Congregação</label>
+          <label className="text-sm font-medium text-gray-700">Congregação (Setor de Atuação)</label>
           <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" {...register('congregacaoId')}>
             <option value="">Sem congregação</option>
             {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Congregação que Pertence</label>
+          <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" {...register('congregacaoOrigemId')}>
+            <option value="">Selecione a congregação</option>
+            {todasCongregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}{c.setor ? ` — Setor ${c.setor.nome}` : ''}</option>)}
           </select>
         </div>
         <div className="flex gap-3">

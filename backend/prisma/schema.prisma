@@ -35,16 +35,18 @@ model Pessoa {
   tipoSanguineo   String?
   nomePai         String?
   nomeMae         String?
-  nomeConjuge     String?
-  foto            String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  nomeConjuge          String?
+  foto                 String?
+  congregacaoOrigemId  Int?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  missionario  Missionario?
-  promotor     PromotorMissoes?
-  agente       AgenteMissoes?
-  secretario   SecretarioMissoes?
-  dependentes  Dependente[]
+  missionario        Missionario?
+  promotor           PromotorMissoes?
+  agente             AgenteMissoes?
+  secretario         SecretarioMissoes?
+  dependentes        Dependente[]
+  congregacaoOrigem  Congregacao? @relation("PessoaCongregacao", fields: [congregacaoOrigemId], references: [id])
 }
 
 model Missionario {
@@ -111,16 +113,20 @@ model Setor {
 }
 
 model Congregacao {
-  id      Int    @id @default(autoincrement())
-  nome    String
-  setorId Int?
-  cidade  String?
-  pastor  String?
-  tipo    String // CAPITAL | INTERIOR
+  id          Int      @id @default(autoincrement())
+  nome        String
+  setorId     Int?
+  cidade      String?
+  pastor      String?
+  tipo        String   // CAPITAL | INTERIOR
+  endereco    String?
+  local       String?
+  metaOferta  Decimal? @db.Decimal(10, 2)
 
   setor   Setor?            @relation(fields: [setorId], references: [id])
   agentes AgenteMissoes[]
   ofertas OfertaMissionaria[]
+  pessoas Pessoa[]          @relation("PessoaCongregacao")
 
   @@unique([nome, setorId])
 }

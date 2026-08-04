@@ -14,6 +14,7 @@ export default function FormPromotor() {
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm();
 
   const { data: setores = [] } = useQuery({ queryKey: ['setores'], queryFn: () => api.get('/setores').then(r => r.data) });
+  const { data: congregacoes = [] } = useQuery({ queryKey: ['congregacoes'], queryFn: () => api.get('/congregacoes').then(r => r.data) });
   const { data: record } = useQuery({
     queryKey: ['promotor', id],
     queryFn: () => api.get(`/promotores-missoes/${id}`).then(r => r.data),
@@ -44,6 +45,7 @@ export default function FormPromotor() {
           <Input label="Telefone" {...register('telefone')} />
           <Input label="E-mail" type="email" {...register('email')} />
           <Input label="CPF" {...register('cpf')} />
+          <Input label="Data de Nascimento" type="date" {...register('dataNascimento')} />
           <Input label="Data Início" type="date" {...register('dataInicio')} />
         </div>
         <div className="flex flex-col gap-1">
@@ -51,6 +53,13 @@ export default function FormPromotor() {
           <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" {...register('setorId', { required: true })}>
             <option value="">Selecione o setor</option>
             {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Congregação que Pertence</label>
+          <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" {...register('congregacaoOrigemId')}>
+            <option value="">Selecione a congregação</option>
+            {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}{c.setor ? ` — Setor ${c.setor.nome}` : ''}</option>)}
           </select>
         </div>
         <div className="flex gap-3">

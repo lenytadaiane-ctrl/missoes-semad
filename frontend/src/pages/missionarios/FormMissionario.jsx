@@ -25,6 +25,7 @@ export default function FormMissionario() {
 
   const { data: bases } = useQuery({ queryKey: ['bases'], queryFn: () => api.get('/bases-missionarias').then(r => r.data) });
   const { data: missionarios } = useQuery({ queryKey: ['missionarios-todos'], queryFn: () => api.get('/missionarios', { params: { limit: 100 } }).then(r => r.data?.data) });
+  const { data: congregacoes = [] } = useQuery({ queryKey: ['congregacoes'], queryFn: () => api.get('/congregacoes').then(r => r.data) });
 
   const { data: record, isLoading } = useQuery({
     queryKey: ['missionario', id],
@@ -114,6 +115,13 @@ export default function FormMissionario() {
           <Input label="Nome da Mãe" {...register('nomeMae')} />
           <Input label="Nome do Cônjuge" {...register('nomeConjuge')} />
           <Input label="Tipo Sanguíneo" {...register('tipoSanguineo')} />
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <label className="text-sm font-medium text-gray-700">Congregação que Pertence</label>
+            <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" {...register('congregacaoOrigemId')}>
+              <option value="">Selecione a congregação</option>
+              {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}{c.setor ? ` — Setor ${c.setor.nome}` : ''}</option>)}
+            </select>
+          </div>
           <Input label="Reservista" {...register('reservista')} />
           <Input label="Título de Eleitor" {...register('tituloEleitor')} />
           <Input label="Zona" {...register('zona')} />

@@ -53,7 +53,10 @@ export default function FormCongregacao() {
           </select>
         </div>
         <Input label="Cidade" {...register('cidade')} />
+        <Input label="Endereço" {...register('endereco')} />
+        <Input label="Local / Bairro" {...register('local')} />
         <Input label="Pastor" {...register('pastor')} />
+        <Input label="Meta de Oferta (R$)" type="number" step="0.01" min="0" {...register('metaOferta')} />
         <div className="flex gap-3">
           <Button type="submit" loading={isSubmitting}>{isEdit ? 'Salvar' : 'Criar'}</Button>
           <Button type="button" variant="secondary" onClick={() => navigate('/congregacoes')}>Cancelar</Button>
