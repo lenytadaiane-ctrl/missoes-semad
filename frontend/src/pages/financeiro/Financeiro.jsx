@@ -13,12 +13,7 @@ const MESES_S = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out',
 const KEYS   = ['m1','m2','m3','m4','m5','m6','m7','m8','m9','m10','m11','m12'];
 
 const fmt  = (v) => v ? `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '';
-const fmtK = (v) => {
-  if (!v || v === 0) return '';
-  if (v >= 1000000) return `R$${(v/1000000).toFixed(1)}M`;
-  if (v >= 1000)    return `R$${(v/1000).toFixed(0)}k`;
-  return `R$${Number(v).toFixed(0)}`;
-};
+const fmtK = (v) => (!v || v === 0) ? '' : `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 
 const anoAtual = new Date().getFullYear();
 const anos = Array.from({ length: 10 }, (_, i) => anoAtual - i);

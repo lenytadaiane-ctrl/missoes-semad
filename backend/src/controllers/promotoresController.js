@@ -6,12 +6,14 @@ function sanitize(val) {
 }
 
 function buildPessoa(body) {
-  const fields = ['nome','cpf','rg','telefone','email','endereco','cep','cidade','estado','sexo','profissao','dataNascimento'];
+  const fields = ['nome','cpf','rg','telefone','email','endereco','cep','cidade','estado','sexo','profissao','dataNascimento','congregacaoOrigemId'];
   const data = {};
   for (const f of fields) {
     if (body[f] !== undefined) data[f] = sanitize(body[f]);
   }
   if (data.dataNascimento) data.dataNascimento = new Date(data.dataNascimento);
+  if (data.congregacaoOrigemId) data.congregacaoOrigemId = parseInt(data.congregacaoOrigemId);
+  else data.congregacaoOrigemId = null;
   return data;
 }
 

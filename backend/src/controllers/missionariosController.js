@@ -6,7 +6,7 @@ const PESSOA_FIELDS = [
   'nome','dataNascimento','cpf','rg','orgaoEmissor','dataEmissao','telefone','email',
   'endereco','cep','cidade','estado','naturalidade','estadoCivil','origemReligiosa',
   'nacionalidade','grauInstrucao','sexo','profissao','tituloEleitor','zona','secao',
-  'reservista','tipoSanguineo','nomePai','nomeMae','nomeConjuge',
+  'reservista','tipoSanguineo','nomePai','nomeMae','nomeConjuge','congregacaoOrigemId',
 ];
 
 // Converte string vazia em null para todos os campos opcionais
@@ -22,6 +22,8 @@ function buildPessoaData(body) {
   }
   if (data.dataNascimento) data.dataNascimento = new Date(data.dataNascimento);
   if (data.dataEmissao) data.dataEmissao = new Date(data.dataEmissao);
+  if (data.congregacaoOrigemId) data.congregacaoOrigemId = parseInt(data.congregacaoOrigemId);
+  else data.congregacaoOrigemId = null;
   return data;
 }
 

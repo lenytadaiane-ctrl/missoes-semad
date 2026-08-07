@@ -1,6 +1,17 @@
 'use strict';
 const prisma = require('../config/prisma');
 
+function buildData(body) {
+  const data = {};
+  const strFields = ['nome', 'cidade', 'pastor', 'tipo', 'endereco', 'local'];
+  for (const f of strFields) {
+    if (body[f] !== undefined) data[f] = body[f] || null;
+  }
+  if (body.setorId !== undefined) data.setorId = body.setorId ? parseInt(body.setorId) : null;
+  if (body.metaOferta !== undefined) data.metaOferta = body.metaOferta ? parseFloat(body.metaOferta) : null;
+  return data;
+}
+
 async function list(req, res, next) {
   try {
     const { setorId, tipo } = req.query;
@@ -22,18 +33,14 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const data = { ...req.body };
-    if (data.setorId) data.setorId = parseInt(data.setorId);
-    const item = await prisma.congregacao.create({ data, include: { setor: true } });
+    const item = await prisma.congregacao.create({ data: buildData(req.body), include: { setor: true } });
     res.status(201).json(item);
   } catch (err) { next(err); }
 }
 
 async function update(req, res, next) {
   try {
-    const data = { ...req.body };
-    if (data.setorId) data.setorId = parseInt(data.setorId);
-    const item = await prisma.congregacao.update({ where: { id: parseInt(req.params.id) }, data, include: { setor: true } });
+    const item = await prisma.congregacao.update({ where: { id: parseInt(req.params.id) }, data: buildData(req.body), include: { setor: true } });
     res.json(item);
   } catch (err) { next(err); }
 }
