@@ -19,6 +19,7 @@ export default function ViewPromotor() {
   const { data: p, isLoading } = useQuery({
     queryKey: ['promotor', id],
     queryFn: () => api.get(`/promotores-missoes/${id}`).then(r => r.data),
+    enabled: !!id,
   });
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;

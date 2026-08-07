@@ -19,6 +19,7 @@ export default function ViewAgente() {
   const { data: a, isLoading } = useQuery({
     queryKey: ['agente', id],
     queryFn: () => api.get(`/agentes-missoes/${id}`).then(r => r.data),
+    enabled: !!id,
   });
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;

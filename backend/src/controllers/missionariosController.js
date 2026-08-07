@@ -65,8 +65,10 @@ async function list(req, res, next) {
 
 async function getById(req, res, next) {
   try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
     const item = await prisma.missionario.findUnique({
-      where: { id: parseInt(req.params.id) },
+      where: { id },
       include: {
         pessoa: true,
         baseMissionaria: true,

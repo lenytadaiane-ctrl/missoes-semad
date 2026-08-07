@@ -19,6 +19,7 @@ export default function ViewSecretario() {
   const { data: s, isLoading } = useQuery({
     queryKey: ['secretario', id],
     queryFn: () => api.get(`/secretarios-missoes/${id}`).then(r => r.data),
+    enabled: !!id,
   });
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;

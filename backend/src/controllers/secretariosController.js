@@ -28,7 +28,9 @@ async function list(req, res, next) {
 
 async function getById(req, res, next) {
   try {
-    const item = await prisma.secretarioMissoes.findUnique({ where: { id: parseInt(req.params.id) }, include: { pessoa: true, setor: true } });
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'ID inválido' });
+    const item = await prisma.secretarioMissoes.findUnique({ where: { id }, include: { pessoa: true, setor: true } });
     if (!item) return res.status(404).json({ error: 'Secretário não encontrado' });
     res.json(item);
   } catch (err) { next(err); }
