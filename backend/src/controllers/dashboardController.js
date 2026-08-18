@@ -127,6 +127,42 @@ async function getDashboard(req, res, next) {
       }]),
     ].sort((a, b) => a.ano - b.ano);
 
+    // ── Aniversariantes (próximos 7 dias) ────────────────────────────────────
+    const todasPessoas = await prisma.pessoa.findMany({
+      where: { dataNascimento: { not: null } },
+      select: {
+        id: true,
+        nome: true,
+        dataNascimento: true,
+        missionario: { select: { id: true } },
+        promotor:    { select: { id: true } },
+        agente:      { select: { id: true } },
+        secretario:  { select: { id: true } },
+      },
+    });
+
+    function diasAte(dataNasc) {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const dn = new Date(dataNasc);
+      const bday = new Date(hoje.getFullYear(), dn.getMonth(), dn.getDate());
+      if (bday < hoje) bday.setFullYear(bday.getFullYear() + 1);
+      return Math.round((bday - hoje) / 86400000);
+    }
+
+    const aniversariantes = todasPessoas
+      .map(p => {
+        const dias = diasAte(p.dataNascimento);
+        const cargo = p.missionario ? 'Missionário'
+          : p.promotor    ? 'Promotor'
+          : p.agente      ? 'Agente'
+          : p.secretario  ? 'Secretário'
+          : null;
+        return { id: p.id, nome: p.nome, dataNascimento: p.dataNascimento, dias, cargo };
+      })
+      .filter(p => p.cargo !== null && p.dias >= 0 && p.dias <= 7)
+      .sort((a, b) => a.dias - b.dias);
+
     // ── Alertas de acompanhamento ─────────────────────────────────────────────
     const limite30dias = new Date();
     limite30dias.setDate(limite30dias.getDate() - 30);
@@ -164,6 +200,7 @@ async function getDashboard(req, res, next) {
       totaisPorSetor,
       topCongregacoesFull,
       topCongregacoes: topCongregacoesFull.slice(0, 5),
+      aniversariantes,
       alertas: {
         semContato: semContatoRaw.map(r => ({
           id: r.id,
