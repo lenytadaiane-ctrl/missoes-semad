@@ -128,6 +128,47 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Alertas Financeiros (congregações sem oferta) ── */}
+      {(() => {
+        const semOferta = data.alertas?.semOfertaMesAnterior;
+        const mesesSem  = data.alertas?.mesesSemOferta || [];
+        if (!semOferta || semOferta.total === 0) return null;
+        const MESES_N = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        return (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-base">⚠️</span>
+              <p className="text-xs font-semibold text-orange-700 uppercase tracking-wider">
+                Lembrete — Congregações sem oferta
+              </p>
+            </div>
+            <p className="text-sm text-orange-800">
+              <span className="font-bold text-lg text-orange-600">{semOferta.total}</span>
+              {' '}congregações não ofertaram em{' '}
+              <span className="font-semibold">{MESES_N[semOferta.mes]}/{semOferta.ano}</span>
+            </p>
+            {mesesSem.length > 0 && (
+              <div>
+                <p className="text-xs text-orange-600 font-medium mb-2">Com mais de 1 mês sem oferta:</p>
+                <div className="flex flex-wrap gap-2">
+                  {mesesSem.slice(0, 20).map((c, i) => (
+                    <span key={i} className={`text-xs px-2 py-1 rounded-lg font-medium ${
+                      c.meses === null || c.meses >= 6 ? 'bg-red-100 text-red-700'
+                      : c.meses >= 3 ? 'bg-orange-100 text-orange-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {c.nome}
+                      {c.meses !== null && <span className="ml-1 opacity-70">({c.meses}m)</span>}
+                    </span>
+                  ))}
+                  {mesesSem.length > 20 && <span className="text-xs text-orange-400">+{mesesSem.length - 20} mais</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ── Capital × Interior (pills) ── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-blue-600 text-white rounded-xl px-5 py-3 flex items-center justify-between shadow-sm">

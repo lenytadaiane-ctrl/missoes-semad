@@ -167,19 +167,50 @@ async function getDashboard(req, res, next) {
     const limite30dias = new Date();
     limite30dias.setDate(limite30dias.getDate() - 30);
 
-    const semContatoRaw = await prisma.$queryRaw`
-      SELECT m.id, p.nome,
-             MAX(i.data) AS ultimoContato,
-             EXTRACT(DAY FROM NOW() - MAX(i.data))::int AS diasSemContato
-      FROM "Missionario" m
-      JOIN "Pessoa" p ON p.id = m."pessoaId"
-      LEFT JOIN "InteracaoMissionario" i ON i."missionarioId" = m.id
-      WHERE m.status = 'ATIVO'
-      GROUP BY m.id, p.nome
-      HAVING MAX(i.data) < ${limite30dias} OR MAX(i.data) IS NULL
-      ORDER BY diasSemContato DESC NULLS FIRST
-      LIMIT 5
-    `;
+    const mesPrev = mesAtual === 1 ? 12 : mesAtual - 1;
+    const anoPrev = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+
+    const [semContatoRaw, semOfertaMesRaw, mesesSemOfertaRaw] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT m.id, p.nome,
+               MAX(i.data) AS ultimoContato,
+               EXTRACT(DAY FROM NOW() - MAX(i.data))::int AS diasSemContato
+        FROM "Missionario" m
+        JOIN "Pessoa" p ON p.id = m."pessoaId"
+        LEFT JOIN "InteracaoMissionario" i ON i."missionarioId" = m.id
+        WHERE m.status = 'ATIVO'
+        GROUP BY m.id, p.nome
+        HAVING MAX(i.data) < ${limite30dias} OR MAX(i.data) IS NULL
+        ORDER BY diasSemContato DESC NULLS FIRST
+        LIMIT 5
+      `,
+      prisma.$queryRaw`
+        SELECT c.id, c.nome, c.tipo
+        FROM "Congregacao" c
+        WHERE NOT EXISTS (
+          SELECT 1 FROM "OfertaMissionaria" o
+          WHERE o."congregacaoId" = c.id
+            AND o."anoReferencia" = ${anoPrev}
+            AND o."mesReferencia" = ${mesPrev}
+        )
+        ORDER BY c.tipo, c.nome
+      `,
+      prisma.$queryRaw`
+        SELECT c.id, c.nome, c.tipo,
+          CASE WHEN MAX(o."anoReferencia") IS NULL THEN NULL
+            ELSE (EXTRACT(YEAR FROM NOW())::int * 12 + EXTRACT(MONTH FROM NOW())::int -
+                  (MAX(o."anoReferencia") * 12 + MAX(o."mesReferencia")))
+          END AS "mesesSemOferta"
+        FROM "Congregacao" c
+        LEFT JOIN "OfertaMissionaria" o ON o."congregacaoId" = c.id
+        GROUP BY c.id, c.nome, c.tipo
+        HAVING MAX(o."anoReferencia") IS NULL OR
+          (EXTRACT(YEAR FROM NOW())::int * 12 + EXTRACT(MONTH FROM NOW())::int -
+           (MAX(o."anoReferencia") * 12 + MAX(o."mesReferencia"))) >= 2
+        ORDER BY "mesesSemOferta" DESC NULLS FIRST
+        LIMIT 30
+      `,
+    ]);
 
     res.json({
       totalMissionariosAtivos,
@@ -207,6 +238,18 @@ async function getDashboard(req, res, next) {
           nome: r.nome,
           ultimoContato: r.ultimoContato,
           diasSemContato: r.diasSemContato ?? null,
+        })),
+        semOfertaMesAnterior: {
+          mes: mesPrev,
+          ano: anoPrev,
+          total: semOfertaMesRaw.length,
+          congregacoes: semOfertaMesRaw.map(r => ({ id: r.id, nome: r.nome, tipo: r.tipo })),
+        },
+        mesesSemOferta: mesesSemOfertaRaw.map(r => ({
+          id: r.id,
+          nome: r.nome,
+          tipo: r.tipo,
+          meses: r.mesesSemOferta !== null ? parseInt(r.mesesSemOferta) : null,
         })),
       },
     });

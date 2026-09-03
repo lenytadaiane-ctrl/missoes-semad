@@ -703,12 +703,22 @@ export default function ViewMissionario() {
   const { data: m, isLoading } = useQuery({
     queryKey: ['missionario', id],
     queryFn: () => api.get(`/missionarios/${id}`).then(r => r.data),
+    enabled: !!id,
+  });
+
+  const { data: ultimoContatoData } = useQuery({
+    queryKey: ['ultimo-contato', id],
+    queryFn: () => api.get(`/missionarios/${id}/acompanhamento/interacoes?limit=1`).then(r => r.data.itens[0] || null),
+    enabled: !!id,
   });
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
   if (!m) return <p className="text-gray-500">Não encontrado.</p>;
 
   const p = m.pessoa || {};
+  const diasSemContato = ultimoContatoData
+    ? Math.floor((Date.now() - new Date(ultimoContatoData.data)) / 86400000)
+    : null;
 
   return (
     <div className="max-w-4xl space-y-5">
@@ -724,9 +734,22 @@ export default function ViewMissionario() {
           )}
           <div>
             <h1 className="text-2xl font-bold text-gray-800">{p.nome}</h1>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge text={m.status} />
               {m.campoMissionario && <span className="text-sm text-gray-500">{m.campoMissionario}</span>}
+              {ultimoContatoData === null && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">Sem contato registrado</span>
+              )}
+              {diasSemContato !== null && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                  diasSemContato === 0 ? 'bg-green-100 text-green-700'
+                  : diasSemContato <= 7  ? 'bg-emerald-100 text-emerald-700'
+                  : diasSemContato <= 30 ? 'bg-amber-100 text-amber-700'
+                  : 'bg-red-100 text-red-700'
+                }`}>
+                  {diasSemContato === 0 ? 'Contato hoje' : diasSemContato === 1 ? 'Último contato ontem' : `Último contato há ${diasSemContato} dias`}
+                </span>
+              )}
             </div>
           </div>
         </div>
