@@ -128,19 +128,37 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Alertas Financeiros (congregações sem oferta) ── */}
+      {/* ── Alertas Financeiros (congregações sem oferta — quinzenal) ── */}
       {(() => {
         const semOferta = data.alertas?.semOfertaMesAnterior;
         const mesesSem  = data.alertas?.mesesSemOferta || [];
         if (!semOferta || semOferta.total === 0) return null;
+
+        const DISMISS_KEY = 'semad_alerta_oferta_dismiss';
+        let mostrar = true;
+        try {
+          const ts = parseInt(localStorage.getItem(DISMISS_KEY) || '0');
+          if (ts && Date.now() - ts < 15 * 24 * 60 * 60 * 1000) mostrar = false;
+        } catch (_) {}
+        if (!mostrar) return null;
+
         const MESES_N = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        function dispensar() {
+          try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (_) {}
+          document.getElementById('alerta-oferta')?.remove();
+        }
         return (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-base">⚠️</span>
-              <p className="text-xs font-semibold text-orange-700 uppercase tracking-wider">
-                Lembrete — Congregações sem oferta
-              </p>
+          <div id="alerta-oferta" className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">⚠️</span>
+                <p className="text-xs font-semibold text-orange-700 uppercase tracking-wider">
+                  Lembrete quinzenal — Congregações sem oferta
+                </p>
+              </div>
+              <button onClick={dispensar} className="text-xs text-orange-400 hover:text-orange-600 underline shrink-0">
+                Dispensar por 15 dias
+              </button>
             </div>
             <p className="text-sm text-orange-800">
               <span className="font-bold text-lg text-orange-600">{semOferta.total}</span>

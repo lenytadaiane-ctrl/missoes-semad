@@ -164,8 +164,8 @@ async function getDashboard(req, res, next) {
       .sort((a, b) => a.dias - b.dias);
 
     // ── Alertas de acompanhamento ─────────────────────────────────────────────
-    const limite30dias = new Date();
-    limite30dias.setDate(limite30dias.getDate() - 30);
+    const limite90dias = new Date();
+    limite90dias.setDate(limite90dias.getDate() - 90);
 
     const mesPrev = mesAtual === 1 ? 12 : mesAtual - 1;
     const anoPrev = mesAtual === 1 ? anoAtual - 1 : anoAtual;
@@ -180,7 +180,7 @@ async function getDashboard(req, res, next) {
         LEFT JOIN "InteracaoMissionario" i ON i."missionarioId" = m.id
         WHERE m.status = 'ATIVO'
         GROUP BY m.id, p.nome
-        HAVING MAX(i.data) < ${limite30dias} OR MAX(i.data) IS NULL
+        HAVING MAX(i.data) < ${limite90dias} OR MAX(i.data) IS NULL
         ORDER BY diasSemContato DESC NULLS FIRST
         LIMIT 5
       `,

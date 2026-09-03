@@ -742,9 +742,9 @@ export default function ViewMissionario() {
               )}
               {diasSemContato !== null && (
                 <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                  diasSemContato === 0 ? 'bg-green-100 text-green-700'
-                  : diasSemContato <= 7  ? 'bg-emerald-100 text-emerald-700'
+                  diasSemContato === 0  ? 'bg-green-100 text-green-700'
                   : diasSemContato <= 30 ? 'bg-amber-100 text-amber-700'
+                  : diasSemContato <= 90 ? 'bg-orange-100 text-orange-700'
                   : 'bg-red-100 text-red-700'
                 }`}>
                   {diasSemContato === 0 ? 'Contato hoje' : diasSemContato === 1 ? 'Último contato ontem' : `Último contato há ${diasSemContato} dias`}
