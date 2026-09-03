@@ -6,6 +6,7 @@ const c = require('../controllers/ofertasController');
 router.get('/resumo', c.resumo);
 router.get('/pivot/setores', c.pivotSetores);
 router.get('/pivot/congregacoes', c.pivotCongregacoes);
+router.get('/pivot/cidades', c.pivotCidades);
 router.post('/upsert', c.upsert);
 router.get('/', c.list);
 router.get('/:id', c.getById);
