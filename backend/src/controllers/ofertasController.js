@@ -123,12 +123,14 @@ async function pivotSetores(req, res, next) {
 async function pivotCongregacoes(req, res, next) {
   try {
     const { Prisma } = require('@prisma/client');
-    const anoRef = parseInt(req.query.ano) || new Date().getFullYear();
+    const anoRef  = parseInt(req.query.ano) || new Date().getFullYear();
     const setorId = req.query.setorId ? parseInt(req.query.setorId) : null;
+    const tipo    = req.query.tipo || null;
     const filtroSetor = setorId ? Prisma.sql`AND c."setorId" = ${setorId}` : Prisma.empty;
+    const filtroTipo  = tipo    ? Prisma.sql`AND c.tipo = ${tipo}`         : Prisma.empty;
 
     const linhas = await prisma.$queryRaw`
-      SELECT c.id, c.nome, c.tipo, s.nome AS setor, s.id AS "setorId",
+      SELECT c.id, c.nome, c.tipo, c.cidade, s.nome AS setor, s.id AS "setorId",
         COALESCE(SUM(CASE WHEN o."mesReferencia"=1  THEN o.valor ELSE 0 END),0)::float AS m1,
         COALESCE(SUM(CASE WHEN o."mesReferencia"=2  THEN o.valor ELSE 0 END),0)::float AS m2,
         COALESCE(SUM(CASE WHEN o."mesReferencia"=3  THEN o.valor ELSE 0 END),0)::float AS m3,
@@ -145,11 +147,44 @@ async function pivotCongregacoes(req, res, next) {
       FROM "Congregacao" c
       LEFT JOIN "Setor" s ON s.id = c."setorId"
       LEFT JOIN "OfertaMissionaria" o ON o."congregacaoId" = c.id AND o."anoReferencia" = ${anoRef}
-      WHERE 1=1 ${filtroSetor}
-      GROUP BY c.id, c.nome, c.tipo, s.nome, s.id
+      WHERE 1=1 ${filtroSetor} ${filtroTipo}
+      GROUP BY c.id, c.nome, c.tipo, c.cidade, s.nome, s.id
       ORDER BY s.nome ASC NULLS LAST, c.nome ASC
     `;
     res.json({ ano: anoRef, linhas });
+  } catch (err) { next(err); }
+}
+
+async function pivotCidades(req, res, next) {
+  try {
+    const { Prisma } = require('@prisma/client');
+    const anoRef = parseInt(req.query.ano) || new Date().getFullYear();
+    const tipo   = req.query.tipo || null;
+    const filtroTipo = tipo ? Prisma.sql`AND c.tipo = ${tipo}` : Prisma.empty;
+
+    const linhas = await prisma.$queryRaw`
+      SELECT COALESCE(c.cidade, '(sem cidade)') AS cidade,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=1  THEN o.valor ELSE 0 END),0)::float AS m1,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=2  THEN o.valor ELSE 0 END),0)::float AS m2,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=3  THEN o.valor ELSE 0 END),0)::float AS m3,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=4  THEN o.valor ELSE 0 END),0)::float AS m4,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=5  THEN o.valor ELSE 0 END),0)::float AS m5,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=6  THEN o.valor ELSE 0 END),0)::float AS m6,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=7  THEN o.valor ELSE 0 END),0)::float AS m7,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=8  THEN o.valor ELSE 0 END),0)::float AS m8,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=9  THEN o.valor ELSE 0 END),0)::float AS m9,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=10 THEN o.valor ELSE 0 END),0)::float AS m10,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=11 THEN o.valor ELSE 0 END),0)::float AS m11,
+        COALESCE(SUM(CASE WHEN o."mesReferencia"=12 THEN o.valor ELSE 0 END),0)::float AS m12,
+        COALESCE(SUM(o.valor),0)::float AS total,
+        COUNT(DISTINCT c.id) AS "qtdCongregacoes"
+      FROM "Congregacao" c
+      LEFT JOIN "OfertaMissionaria" o ON o."congregacaoId" = c.id AND o."anoReferencia" = ${anoRef}
+      WHERE 1=1 ${filtroTipo}
+      GROUP BY c.cidade
+      ORDER BY total DESC
+    `;
+    res.json({ ano: anoRef, linhas: linhas.map(r => ({ ...r, qtdCongregacoes: parseInt(r.qtdCongregacoes) })) });
   } catch (err) { next(err); }
 }
 
@@ -176,4 +211,4 @@ async function upsert(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, getById, create, update, remove, resumo, pivotSetores, pivotCongregacoes, upsert };
+module.exports = { list, getById, create, update, remove, resumo, pivotSetores, pivotCongregacoes, pivotCidades, upsert };

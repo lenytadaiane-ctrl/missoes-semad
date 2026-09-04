@@ -94,6 +94,99 @@ export default function Dashboard() {
         <Kpi label="Mês atual" value={fmtK(data.somaMesAtual)} note={`Acum. ${ano}: ${fmtK(data.somaAnoAtual)}`} accent="blue" />
       </div>
 
+      {/* ── Aniversariantes ── */}
+      {(data.aniversariantes || []).length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-3">
+            🎂 Aniversariantes — próximos 7 dias
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {(data.aniversariantes || []).map((a, i) => {
+              const dn = new Date(a.dataNascimento);
+              const dataFmt = `${String(dn.getUTCDate()).padStart(2,'0')}/${String(dn.getUTCMonth()+1).padStart(2,'0')}`;
+              const isHoje = a.dias === 0;
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm shadow-sm ${
+                    isHoje
+                      ? 'bg-amber-400 text-white font-semibold'
+                      : 'bg-white border border-amber-200 text-gray-700'
+                  }`}
+                >
+                  <span>{isHoje ? '🎂' : '🎁'}</span>
+                  <div className="leading-tight">
+                    <p className="font-medium">{a.nome}</p>
+                    <p className={`text-xs ${isHoje ? 'text-amber-100' : 'text-gray-400'}`}>
+                      {a.cargo} · {dataFmt} · {isHoje ? 'Hoje!' : `em ${a.dias} dia${a.dias > 1 ? 's' : ''}`}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Alertas Financeiros (congregações sem oferta — quinzenal) ── */}
+      {(() => {
+        const semOferta = data.alertas?.semOfertaMesAnterior;
+        const mesesSem  = data.alertas?.mesesSemOferta || [];
+        if (!semOferta || semOferta.total === 0) return null;
+
+        const DISMISS_KEY = 'semad_alerta_oferta_dismiss';
+        let mostrar = true;
+        try {
+          const ts = parseInt(localStorage.getItem(DISMISS_KEY) || '0');
+          if (ts && Date.now() - ts < 15 * 24 * 60 * 60 * 1000) mostrar = false;
+        } catch (_) {}
+        if (!mostrar) return null;
+
+        const MESES_N = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+        function dispensar() {
+          try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch (_) {}
+          document.getElementById('alerta-oferta')?.remove();
+        }
+        return (
+          <div id="alerta-oferta" className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">⚠️</span>
+                <p className="text-xs font-semibold text-orange-700 uppercase tracking-wider">
+                  Lembrete quinzenal — Congregações sem oferta
+                </p>
+              </div>
+              <button onClick={dispensar} className="text-xs text-orange-400 hover:text-orange-600 underline shrink-0">
+                Dispensar por 15 dias
+              </button>
+            </div>
+            <p className="text-sm text-orange-800">
+              <span className="font-bold text-lg text-orange-600">{semOferta.total}</span>
+              {' '}congregações não ofertaram em{' '}
+              <span className="font-semibold">{MESES_N[semOferta.mes]}/{semOferta.ano}</span>
+            </p>
+            {mesesSem.length > 0 && (
+              <div>
+                <p className="text-xs text-orange-600 font-medium mb-2">Com mais de 1 mês sem oferta:</p>
+                <div className="flex flex-wrap gap-2">
+                  {mesesSem.slice(0, 20).map((c, i) => (
+                    <span key={i} className={`text-xs px-2 py-1 rounded-lg font-medium ${
+                      c.meses === null || c.meses >= 6 ? 'bg-red-100 text-red-700'
+                      : c.meses >= 3 ? 'bg-orange-100 text-orange-700'
+                      : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {c.nome}
+                      {c.meses !== null && <span className="ml-1 opacity-70">({c.meses}m)</span>}
+                    </span>
+                  ))}
+                  {mesesSem.length > 20 && <span className="text-xs text-orange-400">+{mesesSem.length - 20} mais</span>}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* ── Capital × Interior (pills) ── */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-blue-600 text-white rounded-xl px-5 py-3 flex items-center justify-between shadow-sm">

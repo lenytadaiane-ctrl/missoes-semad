@@ -229,15 +229,19 @@ function TabContatos({ missionarioId }) {
   const qc = useQueryClient();
   const [modal, setModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm();
+  const [modoWhats, setModoWhats] = useState(false);
+  const { register, handleSubmit, reset, watch, formState: { isSubmitting } } = useForm();
+
+  const tipoAtual = watch('tipo');
 
   const { data, isLoading } = useQuery({
     queryKey: ['interacoes', missionarioId],
     queryFn: () => api.get(`/missionarios/${missionarioId}/acompanhamento/interacoes`).then(r => r.data),
   });
 
-  function openNew() { setEditItem(null); reset({ data: new Date().toISOString().slice(0, 10) }); setModal(true); }
-  function openEdit(item) { setEditItem(item); reset({ ...item, data: item.data?.slice(0, 10) }); setModal(true); }
+  function openNew() { setEditItem(null); setModoWhats(false); reset({ data: new Date().toISOString().slice(0, 10) }); setModal(true); }
+  function openWhatsApp() { setEditItem(null); setModoWhats(true); reset({ data: new Date().toISOString().slice(0, 10), tipo: 'WHATSAPP' }); setModal(true); }
+  function openEdit(item) { setEditItem(item); setModoWhats(false); reset({ ...item, data: item.data?.slice(0, 10) }); setModal(true); }
 
   async function onSubmit(d) {
     try {
@@ -270,7 +274,13 @@ function TabContatos({ missionarioId }) {
             : <p className="text-sm text-amber-600 font-medium">⚠️ Nenhum contato registrado ainda</p>
           }
         </div>
-        <Button onClick={openNew}>+ Registrar Contato</Button>
+        <div className="flex gap-2">
+          <button onClick={openWhatsApp}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-colors">
+            💬 Colar do WhatsApp
+          </button>
+          <Button onClick={openNew}>+ Registrar Contato</Button>
+        </div>
       </div>
 
       {isLoading ? <div className="flex justify-center py-10"><Spinner /></div> : (
@@ -307,7 +317,14 @@ function TabContatos({ missionarioId }) {
         </div>
       )}
 
-      <Modal isOpen={modal} onClose={() => setModal(false)} title={editItem ? 'Editar Contato' : 'Registrar Contato'}>
+      <Modal isOpen={modal} onClose={() => setModal(false)} title={
+        editItem ? 'Editar Contato' : modoWhats ? '💬 Registrar mensagem do WhatsApp' : 'Registrar Contato'
+      }>
+        {modoWhats && !editItem && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 mb-3 text-xs text-emerald-700">
+            Cole abaixo o conteúdo da conversa do WhatsApp. Ajuste a data e clique em Salvar.
+          </div>
+        )}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div><label className="text-xs text-gray-500 block mb-1">Tipo *</label>
@@ -318,9 +335,18 @@ function TabContatos({ missionarioId }) {
             <div><label className="text-xs text-gray-500 block mb-1">Data *</label>
               <input type="date" required {...register('data')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" /></div>
           </div>
-          <div><label className="text-xs text-gray-500 block mb-1">Descrição / Resumo *</label>
-            <textarea required rows={3} {...register('descricao')} placeholder="O que foi conversado, solicitado, decidido..."
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none" /></div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">
+              {(tipoAtual === 'WHATSAPP' || modoWhats) ? 'Mensagem / conteúdo da conversa *' : 'Descrição / Resumo *'}
+            </label>
+            <textarea required rows={tipoAtual === 'WHATSAPP' || modoWhats ? 8 : 3}
+              {...register('descricao')}
+              placeholder={tipoAtual === 'WHATSAPP' || modoWhats
+                ? 'Cole aqui o texto da conversa do WhatsApp...'
+                : 'O que foi conversado, solicitado, decidido...'}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 resize-y font-mono text-xs leading-relaxed"
+            />
+          </div>
           <div><label className="text-xs text-gray-500 block mb-1">Observação interna</label>
             <input {...register('observacao')} placeholder="Observações adicionais (opcional)"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" /></div>
@@ -703,12 +729,22 @@ export default function ViewMissionario() {
   const { data: m, isLoading } = useQuery({
     queryKey: ['missionario', id],
     queryFn: () => api.get(`/missionarios/${id}`).then(r => r.data),
+    enabled: !!id,
+  });
+
+  const { data: ultimoContatoData } = useQuery({
+    queryKey: ['ultimo-contato', id],
+    queryFn: () => api.get(`/missionarios/${id}/acompanhamento/interacoes?limit=1`).then(r => r.data.itens[0] || null),
+    enabled: !!id,
   });
 
   if (isLoading) return <div className="flex justify-center py-20"><Spinner size="lg" /></div>;
   if (!m) return <p className="text-gray-500">Não encontrado.</p>;
 
   const p = m.pessoa || {};
+  const diasSemContato = ultimoContatoData
+    ? Math.floor((Date.now() - new Date(ultimoContatoData.data)) / 86400000)
+    : null;
 
   return (
     <div className="max-w-4xl space-y-5">
@@ -724,9 +760,22 @@ export default function ViewMissionario() {
           )}
           <div>
             <h1 className="text-2xl font-bold text-gray-800">{p.nome}</h1>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge text={m.status} />
               {m.campoMissionario && <span className="text-sm text-gray-500">{m.campoMissionario}</span>}
+              {ultimoContatoData === null && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">Sem contato registrado</span>
+              )}
+              {diasSemContato !== null && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                  diasSemContato === 0  ? 'bg-green-100 text-green-700'
+                  : diasSemContato <= 30 ? 'bg-amber-100 text-amber-700'
+                  : diasSemContato <= 90 ? 'bg-orange-100 text-orange-700'
+                  : 'bg-red-100 text-red-700'
+                }`}>
+                  {diasSemContato === 0 ? 'Contato hoje' : diasSemContato === 1 ? 'Último contato ontem' : `Último contato há ${diasSemContato} dias`}
+                </span>
+              )}
             </div>
           </div>
         </div>

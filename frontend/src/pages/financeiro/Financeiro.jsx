@@ -180,7 +180,7 @@ function TabPorSetor({ ano }) {
 }
 
 // ── Aba Por Congregação ───────────────────────────────────────────────────────
-function TabPorCongregacao({ ano }) {
+function TabPorCongregacao({ ano, tipo }) {
   const [setorId, setSetorId] = useState('');
   const [modal, setModal] = useState(false);
   const [prefill, setPrefill] = useState(null);
@@ -188,8 +188,8 @@ function TabPorCongregacao({ ano }) {
 
   const { data: setores = [] } = useQuery({ queryKey: ['setores'], queryFn: () => api.get('/setores').then(r => r.data) });
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['pivot-congs', ano, setorId],
-    queryFn: () => api.get('/ofertas-missionarias/pivot/congregacoes', { params: { ano, setorId: setorId || undefined } }).then(r => r.data),
+    queryKey: ['pivot-congs', ano, setorId, tipo],
+    queryFn: () => api.get('/ofertas-missionarias/pivot/congregacoes', { params: { ano, setorId: setorId || undefined, tipo: tipo || undefined } }).then(r => r.data),
   });
 
   const linhas = data?.linhas || [];
@@ -470,15 +470,152 @@ function TabLancamentos({ ano }) {
   );
 }
 
+// ── Aba Por Cidade ────────────────────────────────────────────────────────────
+function TabPorCidade({ ano }) {
+  const [tipo, setTipo] = useState('');
+  const { data, isLoading } = useQuery({
+    queryKey: ['pivot-cidades', ano, tipo],
+    queryFn: () => api.get('/ofertas-missionarias/pivot/cidades', { params: { ano, tipo: tipo || undefined } }).then(r => r.data),
+  });
+
+  const linhas = data?.linhas || [];
+  const totaisCol = KEYS.map(k => linhas.reduce((s, l) => s + (l[k] || 0), 0));
+  const totalGeral = linhas.reduce((s, l) => s + (l.total || 0), 0);
+
+  if (isLoading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm text-sm">
+          <span className="text-gray-400 text-xs">Tipo:</span>
+          <select className="bg-transparent focus:outline-none text-gray-700 font-medium" value={tipo} onChange={e => setTipo(e.target.value)}>
+            <option value="">Capital + Interior</option>
+            <option value="CAPITAL">Capital</option>
+            <option value="INTERIOR">Interior</option>
+          </select>
+        </div>
+      </div>
+      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+        <table className="min-w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider min-w-[160px] border-r border-gray-200">Cidade</th>
+              <th className="px-2 py-3 text-right text-xs font-bold text-gray-500 uppercase min-w-[50px]">Cong.</th>
+              {MESES_S.slice(1).map((m, i) => (
+                <th key={i} className="px-1 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[60px]">{m}</th>
+              ))}
+              <th className="px-3 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider min-w-[90px] border-l border-gray-200">Total</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {linhas.map((linha, idx) => (
+              <tr key={linha.cidade} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                <td className="sticky left-0 z-10 bg-inherit px-4 py-2.5 font-semibold text-gray-800 border-r border-gray-200 whitespace-nowrap">{linha.cidade}</td>
+                <td className="px-2 py-2.5 text-center text-xs text-gray-400">{linha.qtdCongregacoes}</td>
+                {KEYS.map((k, i) => {
+                  const v = linha[k] || 0;
+                  return <td key={i} className={`px-1 py-2.5 text-right text-xs whitespace-nowrap ${v === 0 ? 'text-gray-200' : 'text-gray-700 font-medium'}`}>{v === 0 ? '—' : fmtK(v)}</td>;
+                })}
+                <td className="px-3 py-2.5 text-right font-bold text-blue-700 border-l border-gray-200 whitespace-nowrap">{linha.total > 0 ? fmtK(linha.total) : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="bg-blue-600 text-white">
+              <td className="sticky left-0 z-10 bg-blue-600 px-4 py-3 font-bold text-sm border-r border-blue-500">TOTAL GERAL</td>
+              <td className="px-2 py-3 text-center text-xs opacity-60">{linhas.reduce((s, l) => s + l.qtdCongregacoes, 0)}</td>
+              {totaisCol.map((t, i) => (
+                <td key={i} className={`px-1 py-3 text-right text-xs font-semibold whitespace-nowrap ${t === 0 ? 'opacity-40' : ''}`}>{t === 0 ? '—' : fmtK(t)}</td>
+              ))}
+              <td className="px-3 py-3 text-right font-bold border-l border-blue-500 whitespace-nowrap">{fmtK(totalGeral)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Modal Nova Congregação ────────────────────────────────────────────────────
+function ModalNovaCongregacao({ open, onClose }) {
+  const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm();
+  const qc = useQueryClient();
+  const { data: setores = [] } = useQuery({ queryKey: ['setores'], queryFn: () => api.get('/setores').then(r => r.data) });
+
+  async function onSubmit(data) {
+    try {
+      await api.post('/congregacoes', data);
+      toast.success('Congregação criada!');
+      qc.invalidateQueries(['congregacoes']);
+      qc.invalidateQueries(['pivot-congs']);
+      qc.invalidateQueries(['pivot-cidades']);
+      reset();
+      onClose();
+    } catch (e) { toast.error(e.response?.data?.error || e.message); }
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Nova Congregação">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="text-xs text-gray-500 block mb-1">Nome *</label>
+            <input required {...register('nome')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Tipo *</label>
+            <select required {...register('tipo')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">Selecione</option>
+              <option value="CAPITAL">Capital</option>
+              <option value="INTERIOR">Interior</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Setor</label>
+            <select {...register('setorId')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+              <option value="">Sem setor</option>
+              {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Cidade</label>
+            <input {...register('cidade')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Pastor</label>
+            <input {...register('pastor')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Endereço</label>
+            <input {...register('endereco')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">Meta de Oferta (R$)</label>
+            <input type="number" step="0.01" {...register('metaOferta')} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="secondary" type="button" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : 'Criar Congregação'}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function Financeiro() {
   const [aba, setAba] = useState('setores');
   const [ano, setAno] = useState(String(anoAtual));
+  const [modalCong, setModalCong] = useState(false);
 
   const ABAS = [
-    { id: 'setores',       label: '🗂️ Por Setor' },
-    { id: 'congregacoes',  label: '⛪ Por Congregação' },
-    { id: 'lancamentos',   label: '📋 Lançamentos' },
+    { id: 'setores',    label: '🗂️ Por Setor' },
+    { id: 'capital',    label: '🏙️ Capital' },
+    { id: 'interior',   label: '🌳 Interior' },
+    { id: 'cidades',    label: '📍 Por Cidade' },
+    { id: 'lancamentos',label: '📋 Lançamentos' },
   ];
 
   return (
@@ -497,10 +634,13 @@ export default function Financeiro() {
           <span className="inline-block w-2 h-2 rounded-full bg-blue-500" /> Capital
           <span className="inline-block w-2 h-2 rounded-full bg-violet-500 ml-1" /> Interior
         </div>
+        <div className="ml-auto">
+          <Button onClick={() => setModalCong(true)}>+ Nova Congregação</Button>
+        </div>
       </div>
 
       {/* Abas */}
-      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
         {ABAS.map(a => (
           <button key={a.id} onClick={() => setAba(a.id)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap
@@ -511,9 +651,13 @@ export default function Financeiro() {
       </div>
 
       {/* Conteúdo */}
-      {aba === 'setores'      && <TabPorSetor ano={ano} />}
-      {aba === 'congregacoes' && <TabPorCongregacao ano={ano} />}
-      {aba === 'lancamentos'  && <TabLancamentos ano={ano} />}
+      {aba === 'setores'     && <TabPorSetor ano={ano} />}
+      {aba === 'capital'     && <TabPorCongregacao ano={ano} tipo="CAPITAL" />}
+      {aba === 'interior'    && <TabPorCongregacao ano={ano} tipo="INTERIOR" />}
+      {aba === 'cidades'     && <TabPorCidade ano={ano} />}
+      {aba === 'lancamentos' && <TabLancamentos ano={ano} />}
+
+      <ModalNovaCongregacao open={modalCong} onClose={() => setModalCong(false)} />
     </div>
   );
 }
