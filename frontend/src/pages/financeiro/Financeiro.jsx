@@ -18,7 +18,7 @@ const fmtK = (v) => (!v || v === 0) ? '' : `R$ ${Number(v).toLocaleString('pt-BR
 const anoAtual = new Date().getFullYear();
 const anos = Array.from({ length: 10 }, (_, i) => anoAtual - i);
 
-// ── Célula clicável da tabela de congregações ─────────────────────────────────
+// ── Célula clicável ───────────────────────────────────────────────────────────
 function Celula({ valor, onClick }) {
   const vazio = !valor || valor === 0;
   return (
@@ -53,6 +53,8 @@ function ModalLancamento({ open, onClose, prefill, ano, onSalvo }) {
       toast.success('Lançamento salvo!');
       qc.invalidateQueries(['pivot-setores']);
       qc.invalidateQueries(['pivot-congs']);
+      qc.invalidateQueries(['pivot-congs-setor']);
+      qc.invalidateQueries(['pivot-cidades']);
       qc.invalidateQueries(['ofertas']);
       onSalvo?.();
       onClose();
@@ -108,69 +110,125 @@ function ModalLancamento({ open, onClose, prefill, ano, onSalvo }) {
   );
 }
 
-// ── Aba Por Setor ─────────────────────────────────────────────────────────────
-function TabPorSetor({ ano }) {
-  const { data, isLoading } = useQuery({
-    queryKey: ['pivot-setores', ano],
-    queryFn: () => api.get('/ofertas-missionarias/pivot/setores', { params: { ano } }).then(r => r.data),
-  });
-
-  const linhas = data?.linhas || [];
-
-  // totais por coluna
-  const totaisCol = KEYS.map((k, i) =>
-    linhas.reduce((s, l) => s + (parseFloat(l[k]) || 0), 0)
+// ── Toolbar de modo (Anual / Mensal) ─────────────────────────────────────────
+function ModoToolbar({ modo, setModo, mesSel, setMesSel }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+        <button onClick={() => setModo('anual')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap
+            ${modo === 'anual' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+          📅 Panorama Anual
+        </button>
+        <button onClick={() => setModo('mensal')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap
+            ${modo === 'mensal' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+          📆 Mensal
+        </button>
+      </div>
+      {modo === 'mensal' && (
+        <select
+          className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm bg-white shadow-sm focus:outline-none"
+          value={mesSel} onChange={e => setMesSel(e.target.value)}>
+          {MESES_L.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+        </select>
+      )}
+    </div>
   );
-  const totalGeral = linhas.reduce((s, l) => s + (parseFloat(l.total) || 0), 0);
+}
 
-  if (isLoading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
+// ── Tabela pivot: linhas simples (setores ou cidades) ─────────────────────────
+function PivotTable({ linhas, nomeHeader, getLabel, modo, mesSel, loading, extraCols = [] }) {
+  const mesK = `m${mesSel}`;
+
+  const totaisAnual = KEYS.map(k => linhas.reduce((s, l) => s + (parseFloat(l[k]) || 0), 0));
+  const totalMes    = linhas.reduce((s, l) => s + (parseFloat(l[mesK]) || 0), 0);
+  const totalGeral  = modo === 'anual'
+    ? linhas.reduce((s, l) => s + (parseFloat(l.total) || 0), 0)
+    : totalMes;
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
+  if (!linhas.length) return <p className="text-center text-gray-400 py-8 text-sm">Nenhum dado encontrado.</p>;
+
+  const colSpanTotal = 1 + extraCols.length + (modo === 'anual' ? 12 : 1) + 1;
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
       <table className="min-w-full text-sm border-collapse">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider min-w-[140px] border-r border-gray-200">
-              Setor
+            <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider min-w-[160px] border-r border-gray-200">
+              {nomeHeader}
             </th>
-            {MESES_S.slice(1).map((m, i) => (
-              <th key={i} className="px-2 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[72px]">{m}</th>
+            {extraCols.map((col, i) => (
+              <th key={i} className="px-2 py-3 text-right text-xs font-bold text-gray-500 uppercase min-w-[50px]">{col.header}</th>
             ))}
-            <th className="px-3 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider min-w-[90px] border-l border-gray-200">Total</th>
+            {modo === 'anual' ? (
+              MESES_S.slice(1).map((m, i) => (
+                <th key={i} className="px-2 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[72px]">{m}</th>
+              ))
+            ) : (
+              <th className="px-3 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[130px]">
+                {MESES_L[parseInt(mesSel)]}
+              </th>
+            )}
+            <th className="px-3 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider min-w-[100px] border-l border-gray-200">
+              {modo === 'anual' ? 'Total Anual' : 'Total'}
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {linhas.map((linha, idx) => (
-            <tr key={linha.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-              <td className="sticky left-0 z-10 bg-inherit px-4 py-2.5 font-semibold text-gray-800 border-r border-gray-200 whitespace-nowrap">
-                <span className={`inline-flex items-center gap-1.5`}>
-                  <span className={`w-2 h-2 rounded-full ${linha.tipo === 'CAPITAL' ? 'bg-blue-500' : 'bg-violet-500'}`} />
-                  {linha.nome}
-                </span>
-              </td>
-              {KEYS.map((k, i) => {
-                const v = parseFloat(linha[k]) || 0;
-                return (
-                  <td key={i} className={`px-2 py-2.5 text-right text-xs whitespace-nowrap
-                    ${v === 0 ? 'text-gray-200' : 'text-gray-700 font-medium'}`}>
-                    {v === 0 ? '—' : fmtK(v)}
+          {linhas.map((linha, idx) => {
+            const valorMes  = parseFloat(linha[mesK]) || 0;
+            const totalLinha = modo === 'anual' ? parseFloat(linha.total) || 0 : valorMes;
+            return (
+              <tr key={linha.id || linha.cidade || idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
+                <td className="sticky left-0 z-10 bg-inherit px-4 py-2.5 font-semibold text-gray-800 border-r border-gray-200 whitespace-nowrap text-sm">
+                  {getLabel(linha)}
+                </td>
+                {extraCols.map((col, i) => (
+                  <td key={i} className="px-2 py-2.5 text-center text-xs text-gray-400">{col.render(linha)}</td>
+                ))}
+                {modo === 'anual' ? (
+                  KEYS.map((k, i) => {
+                    const v = parseFloat(linha[k]) || 0;
+                    return (
+                      <td key={i} className={`px-2 py-2.5 text-right text-xs whitespace-nowrap ${v === 0 ? 'text-gray-200' : 'text-gray-700 font-medium'}`}>
+                        {v === 0 ? '—' : fmtK(v)}
+                      </td>
+                    );
+                  })
+                ) : (
+                  <td className={`px-3 py-2.5 text-right text-sm whitespace-nowrap ${valorMes === 0 ? 'text-gray-200' : 'text-gray-700 font-medium'}`}>
+                    {valorMes === 0 ? '—' : fmtK(valorMes)}
                   </td>
-                );
-              })}
-              <td className="px-3 py-2.5 text-right font-bold text-blue-700 border-l border-gray-200 whitespace-nowrap">
-                {parseFloat(linha.total) > 0 ? fmtK(parseFloat(linha.total)) : '—'}
-              </td>
-            </tr>
-          ))}
+                )}
+                <td className="px-3 py-2.5 text-right font-bold text-blue-700 border-l border-gray-200 whitespace-nowrap">
+                  {totalLinha > 0 ? fmtK(totalLinha) : '—'}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
         <tfoot>
           <tr className="bg-blue-600 text-white">
             <td className="sticky left-0 z-10 bg-blue-600 px-4 py-3 font-bold text-sm border-r border-blue-500">TOTAL GERAL</td>
-            {totaisCol.map((t, i) => (
-              <td key={i} className={`px-2 py-3 text-right text-xs font-semibold whitespace-nowrap ${t === 0 ? 'opacity-40' : ''}`}>
-                {t === 0 ? '—' : fmtK(t)}
+            {extraCols.map((col, i) => (
+              <td key={i} className="px-2 py-3 text-center text-xs opacity-60">
+                {col.total ? col.total(linhas) : ''}
               </td>
             ))}
+            {modo === 'anual' ? (
+              totaisAnual.map((t, i) => (
+                <td key={i} className={`px-2 py-3 text-right text-xs font-semibold whitespace-nowrap ${t === 0 ? 'opacity-40' : ''}`}>
+                  {t === 0 ? '—' : fmtK(t)}
+                </td>
+              ))
+            ) : (
+              <td className="px-3 py-3 text-right text-sm font-semibold whitespace-nowrap">
+                {totalMes === 0 ? '—' : fmtK(totalMes)}
+              </td>
+            )}
             <td className="px-3 py-3 text-right font-bold border-l border-blue-500 whitespace-nowrap">{fmtK(totalGeral)}</td>
           </tr>
         </tfoot>
@@ -179,7 +237,268 @@ function TabPorSetor({ ano }) {
   );
 }
 
-// ── Aba Por Congregação ───────────────────────────────────────────────────────
+// ── Tabela pivot: congregações agrupadas por setor ────────────────────────────
+function PivotTableCongs({ linhas, modo, mesSel, loading, onCelulaClick }) {
+  const mesK = `m${mesSel}`;
+
+  const grupos = {};
+  linhas.forEach(l => {
+    const chave = l.setor || '(Sem setor)';
+    if (!grupos[chave]) grupos[chave] = { linhas: [] };
+    grupos[chave].linhas.push(l);
+  });
+
+  const totaisAnual = KEYS.map(k => linhas.reduce((s, l) => s + (parseFloat(l[k]) || 0), 0));
+  const totalMes    = linhas.reduce((s, l) => s + (parseFloat(l[mesK]) || 0), 0);
+  const totalGeral  = modo === 'anual'
+    ? linhas.reduce((s, l) => s + (parseFloat(l.total) || 0), 0)
+    : totalMes;
+
+  const numColsData = modo === 'anual' ? 12 : 1;
+  const colSpanTotal = 1 + numColsData + 1;
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
+  if (!linhas.length) return <p className="text-center text-gray-400 py-8 text-sm">Nenhum dado encontrado.</p>;
+
+  return (
+    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+      <table className="min-w-full text-sm border-collapse">
+        <thead>
+          <tr className="bg-gray-50 border-b border-gray-200">
+            <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider min-w-[180px] border-r border-gray-200">
+              Congregação
+            </th>
+            {modo === 'anual' ? (
+              MESES_S.slice(1).map((m, i) => (
+                <th key={i} className="px-1 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[60px]">{m}</th>
+              ))
+            ) : (
+              <th className="px-3 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[130px]">
+                {MESES_L[parseInt(mesSel)]}
+              </th>
+            )}
+            <th className="px-3 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider min-w-[100px] border-l border-gray-200">
+              {modo === 'anual' ? 'Total Anual' : 'Total'}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(grupos).map(([nomeSetor, grupo]) => {
+            const subAnual = KEYS.map(k => grupo.linhas.reduce((s, l) => s + (parseFloat(l[k]) || 0), 0));
+            const subMes   = grupo.linhas.reduce((s, l) => s + (parseFloat(l[mesK]) || 0), 0);
+            const subtotal = modo === 'anual'
+              ? grupo.linhas.reduce((s, l) => s + (parseFloat(l.total) || 0), 0)
+              : subMes;
+
+            return (
+              <>
+                <tr key={`h-${nomeSetor}`} className="bg-gray-100 border-y border-gray-200">
+                  <td colSpan={colSpanTotal} className="sticky left-0 z-10 bg-gray-100 px-4 py-1.5">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Setor {nomeSetor}</span>
+                  </td>
+                </tr>
+                {grupo.linhas.map((cong, idx) => {
+                  const valorMes  = parseFloat(cong[mesK]) || 0;
+                  const totalCong = modo === 'anual' ? parseFloat(cong.total) || 0 : valorMes;
+                  return (
+                    <tr key={cong.id} className={`border-b border-gray-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                      <td className="sticky left-0 z-10 bg-inherit px-4 py-2 text-gray-700 border-r border-gray-200 whitespace-nowrap text-xs font-medium">
+                        <span className="inline-flex items-center gap-1">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cong.tipo === 'CAPITAL' ? 'bg-blue-400' : 'bg-violet-400'}`} />
+                          {cong.nome}
+                        </span>
+                      </td>
+                      {modo === 'anual' ? (
+                        KEYS.map((k, i) => (
+                          <Celula key={i} valor={parseFloat(cong[k]) || 0}
+                            onClick={() => onCelulaClick?.(cong, i + 1)} />
+                        ))
+                      ) : (
+                        <td
+                          className={`px-3 py-2 text-right text-sm whitespace-nowrap cursor-pointer select-none transition-colors
+                            ${valorMes === 0 ? 'text-gray-200 hover:bg-blue-50 hover:text-blue-400' : 'text-gray-700 font-medium hover:bg-blue-50 hover:text-blue-700'}`}
+                          title={valorMes ? fmt(valorMes) : 'Clique para lançar'}
+                          onClick={() => onCelulaClick?.(cong, parseInt(mesSel))}
+                        >
+                          {valorMes === 0 ? '—' : fmtK(valorMes)}
+                        </td>
+                      )}
+                      <td className="px-3 py-2 text-right text-xs font-bold text-blue-700 border-l border-gray-200 whitespace-nowrap">
+                        {totalCong > 0 ? fmtK(totalCong) : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr key={`sub-${nomeSetor}`} className="bg-gray-100 border-b border-gray-300">
+                  <td className="sticky left-0 z-10 bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-600 border-r border-gray-200">
+                    Subtotal {nomeSetor}
+                  </td>
+                  {modo === 'anual' ? (
+                    subAnual.map((t, i) => (
+                      <td key={i} className={`px-1 py-1.5 text-right text-xs font-semibold whitespace-nowrap ${t === 0 ? 'text-gray-200' : 'text-gray-700'}`}>
+                        {t === 0 ? '—' : fmtK(t)}
+                      </td>
+                    ))
+                  ) : (
+                    <td className={`px-3 py-1.5 text-right text-sm font-semibold whitespace-nowrap ${subMes === 0 ? 'text-gray-200' : 'text-gray-700'}`}>
+                      {subMes === 0 ? '—' : fmtK(subMes)}
+                    </td>
+                  )}
+                  <td className="px-3 py-1.5 text-right text-xs font-bold text-blue-700 border-l border-gray-200">{fmtK(subtotal)}</td>
+                </tr>
+              </>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr className="bg-blue-600 text-white">
+            <td className="sticky left-0 z-10 bg-blue-600 px-4 py-3 font-bold text-sm border-r border-blue-500">TOTAL GERAL</td>
+            {modo === 'anual' ? (
+              totaisAnual.map((t, i) => (
+                <td key={i} className={`px-1 py-3 text-right text-xs font-semibold whitespace-nowrap ${t === 0 ? 'opacity-40' : ''}`}>
+                  {t === 0 ? '—' : fmtK(t)}
+                </td>
+              ))
+            ) : (
+              <td className="px-3 py-3 text-right text-sm font-semibold whitespace-nowrap">
+                {totalMes === 0 ? '—' : fmtK(totalMes)}
+              </td>
+            )}
+            <td className="px-3 py-3 text-right font-bold border-l border-blue-500 whitespace-nowrap">{fmtK(totalGeral)}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+// ── Aba Setores (hub com 3 sub-visões + toggle Anual/Mensal) ─────────────────
+function TabRelatorioSetor({ ano }) {
+  const [subAba, setSubAba] = useState('setores');
+  const [modo, setModo]     = useState('anual');
+  const [mesSel, setMesSel] = useState(String(new Date().getMonth() + 1));
+  const [modal, setModal]   = useState(false);
+  const [prefill, setPrefill] = useState(null);
+  const qc = useQueryClient();
+
+  const { data: dataSetores, isLoading: loadSetores } = useQuery({
+    queryKey: ['pivot-setores', ano],
+    queryFn: () => api.get('/ofertas-missionarias/pivot/setores', { params: { ano } }).then(r => r.data),
+  });
+  const { data: dataCidades, isLoading: loadCidades } = useQuery({
+    queryKey: ['pivot-cidades', ano],
+    queryFn: () => api.get('/ofertas-missionarias/pivot/cidades', { params: { ano } }).then(r => r.data),
+    enabled: subAba === 'cidades',
+  });
+  const { data: dataCongs, isLoading: loadCongs } = useQuery({
+    queryKey: ['pivot-congs-setor', ano],
+    queryFn: () => api.get('/ofertas-missionarias/pivot/congregacoes', { params: { ano } }).then(r => r.data),
+    enabled: subAba === 'congregacoes',
+  });
+
+  function abrirCelula(cong, mes) {
+    setPrefill({
+      congregacaoId: cong.id,
+      congregacaoNome: cong.nome,
+      setorId: cong.setorId,
+      mes,
+      valor: parseFloat(cong[`m${mes}`]) || '',
+    });
+    setModal(true);
+  }
+
+  const SUB_ABAS = [
+    { id: 'setores',      label: '🗂️ Por Setor' },
+    { id: 'cidades',      label: '📍 Por Cidade' },
+    { id: 'congregacoes', label: '🏘️ Por Congregação' },
+  ];
+
+  return (
+    <div className="space-y-3">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Sub-navegação */}
+        <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+          {SUB_ABAS.map(s => (
+            <button key={s.id} onClick={() => setSubAba(s.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap
+                ${subAba === s.id ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+              {s.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Toggle Anual / Mensal */}
+        <ModoToolbar modo={modo} setModo={setModo} mesSel={mesSel} setMesSel={setMesSel} />
+
+        {/* Botão lançamento (só na visão de congregações) */}
+        {subAba === 'congregacoes' && (
+          <div className="ml-auto flex items-center gap-3">
+            <p className="text-xs text-gray-400 hidden sm:block">Clique em uma célula para lançar</p>
+            <Button onClick={() => { setPrefill(null); setModal(true); }}>+ Novo Lançamento</Button>
+          </div>
+        )}
+      </div>
+
+      {/* Tabelas */}
+      {subAba === 'setores' && (
+        <PivotTable
+          linhas={dataSetores?.linhas || []}
+          nomeHeader="Setor"
+          getLabel={l => (
+            <span className="inline-flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full ${l.tipo === 'CAPITAL' ? 'bg-blue-500' : 'bg-violet-500'}`} />
+              {l.nome}
+            </span>
+          )}
+          modo={modo}
+          mesSel={mesSel}
+          loading={loadSetores}
+        />
+      )}
+
+      {subAba === 'cidades' && (
+        <PivotTable
+          linhas={dataCidades?.linhas || []}
+          nomeHeader="Cidade"
+          getLabel={l => l.cidade}
+          extraCols={[{
+            header: 'Cong.',
+            render: l => l.qtdCongregacoes,
+            total: ls => ls.reduce((s, l) => s + (l.qtdCongregacoes || 0), 0),
+          }]}
+          modo={modo}
+          mesSel={mesSel}
+          loading={loadCidades}
+        />
+      )}
+
+      {subAba === 'congregacoes' && (
+        <PivotTableCongs
+          linhas={dataCongs?.linhas || []}
+          modo={modo}
+          mesSel={mesSel}
+          loading={loadCongs}
+          onCelulaClick={abrirCelula}
+        />
+      )}
+
+      <ModalLancamento
+        open={modal}
+        onClose={() => setModal(false)}
+        prefill={prefill}
+        ano={ano}
+        onSalvo={() => {
+          qc.invalidateQueries(['pivot-setores']);
+          qc.invalidateQueries(['pivot-cidades']);
+          qc.invalidateQueries(['pivot-congs-setor']);
+        }}
+      />
+    </div>
+  );
+}
+
+// ── Aba Por Congregação (Capital / Interior) ──────────────────────────────────
 function TabPorCongregacao({ ano, tipo }) {
   const [setorId, setSetorId] = useState('');
   const [modal, setModal] = useState(false);
@@ -194,7 +513,6 @@ function TabPorCongregacao({ ano, tipo }) {
 
   const linhas = data?.linhas || [];
 
-  // agrupar por setor
   const grupos = {};
   linhas.forEach(l => {
     const chave = l.setor || '(Sem setor)';
@@ -223,7 +541,7 @@ function TabPorCongregacao({ ano, tipo }) {
             {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
           </select>
         </div>
-        <p className="text-xs text-gray-400">Clique em uma célula para lançar ou editar o valor</p>
+        <p className="text-xs text-gray-400">Clique em uma célula para lançar ou editar</p>
         <div className="ml-auto">
           <Button onClick={() => { setPrefill(null); setModal(true); }}>+ Novo Lançamento</Button>
         </div>
@@ -248,17 +566,15 @@ function TabPorCongregacao({ ano, tipo }) {
               const subtotal = grupo.linhas.reduce((s, l) => s + (parseFloat(l.total) || 0), 0);
               return (
                 <>
-                  {/* Cabeçalho do setor */}
                   <tr key={`h-${nomeSetor}`} className="bg-gray-100 border-y border-gray-200">
                     <td colSpan={14} className="sticky left-0 z-10 bg-gray-100 px-4 py-1.5">
                       <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Setor {nomeSetor}</span>
                     </td>
                   </tr>
-                  {/* Linhas de congregações */}
                   {grupo.linhas.map((cong, idx) => (
                     <tr key={cong.id} className={`border-b border-gray-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                       <td className="sticky left-0 z-10 bg-inherit px-4 py-2 text-gray-700 border-r border-gray-200 whitespace-nowrap text-xs font-medium">
-                        <span className={`inline-flex items-center gap-1`}>
+                        <span className="inline-flex items-center gap-1">
                           <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${cong.tipo === 'CAPITAL' ? 'bg-blue-400' : 'bg-violet-400'}`} />
                           {cong.nome}
                         </span>
@@ -271,7 +587,6 @@ function TabPorCongregacao({ ano, tipo }) {
                       </td>
                     </tr>
                   ))}
-                  {/* Subtotal do setor */}
                   <tr key={`sub-${nomeSetor}`} className="bg-gray-100 border-b border-gray-300">
                     <td className="sticky left-0 z-10 bg-gray-100 px-4 py-1.5 text-xs font-bold text-gray-600 border-r border-gray-200">
                       Subtotal {nomeSetor}
@@ -312,7 +627,7 @@ function TabPorCongregacao({ ano, tipo }) {
   );
 }
 
-// ── Aba Lançamentos (lista existente) ─────────────────────────────────────────
+// ── Aba Lançamentos ───────────────────────────────────────────────────────────
 function TabLancamentos({ ano }) {
   const [filtros, setFiltros] = useState({ mes: '', tipo: '', setorId: '', congregacaoId: '', page: 1 });
   const [modal, setModal] = useState(false);
@@ -343,6 +658,8 @@ function TabLancamentos({ ano }) {
       qc.invalidateQueries({ queryKey: ['ofertas'] });
       qc.invalidateQueries(['pivot-setores']);
       qc.invalidateQueries(['pivot-congs']);
+      qc.invalidateQueries(['pivot-congs-setor']);
+      qc.invalidateQueries(['pivot-cidades']);
     } catch (err) { toast.error(err.message); }
   }
 
@@ -354,16 +671,18 @@ function TabLancamentos({ ano }) {
       qc.invalidateQueries({ queryKey: ['ofertas'] });
       qc.invalidateQueries(['pivot-setores']);
       qc.invalidateQueries(['pivot-congs']);
+      qc.invalidateQueries(['pivot-congs-setor']);
+      qc.invalidateQueries(['pivot-cidades']);
     } catch (err) { toast.error(err.message); }
   }
 
   const columns = [
-    { key: 'cong', header: 'Congregação', render: r => r.congregacao?.nome },
-    { key: 'setor', header: 'Setor', render: r => r.congregacao?.setor?.nome || '—' },
-    { key: 'tipo', header: 'Tipo', render: r => r.congregacao?.tipo },
-    { key: 'mes', header: 'Mês', render: r => MESES_L[r.mesReferencia] },
-    { key: 'ano', header: 'Ano', render: r => r.anoReferencia },
-    { key: 'valor', header: 'Valor', render: r => fmt(r.valor) },
+    { key: 'cong',  header: 'Congregação', render: r => r.congregacao?.nome },
+    { key: 'setor', header: 'Setor',        render: r => r.congregacao?.setor?.nome || '—' },
+    { key: 'tipo',  header: 'Tipo',         render: r => r.congregacao?.tipo },
+    { key: 'mes',   header: 'Mês',          render: r => MESES_L[r.mesReferencia] },
+    { key: 'ano',   header: 'Ano',          render: r => r.anoReferencia },
+    { key: 'valor', header: 'Valor',        render: r => fmt(r.valor) },
     { key: 'acoes', header: 'Ações', render: r => (
       <div className="flex gap-2">
         <button onClick={() => openEdit(r)} className="text-blue-600 hover:underline text-xs">Editar</button>
@@ -470,73 +789,6 @@ function TabLancamentos({ ano }) {
   );
 }
 
-// ── Aba Por Cidade ────────────────────────────────────────────────────────────
-function TabPorCidade({ ano }) {
-  const [tipo, setTipo] = useState('');
-  const { data, isLoading } = useQuery({
-    queryKey: ['pivot-cidades', ano, tipo],
-    queryFn: () => api.get('/ofertas-missionarias/pivot/cidades', { params: { ano, tipo: tipo || undefined } }).then(r => r.data),
-  });
-
-  const linhas = data?.linhas || [];
-  const totaisCol = KEYS.map(k => linhas.reduce((s, l) => s + (l[k] || 0), 0));
-  const totalGeral = linhas.reduce((s, l) => s + (l.total || 0), 0);
-
-  if (isLoading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shadow-sm text-sm">
-          <span className="text-gray-400 text-xs">Tipo:</span>
-          <select className="bg-transparent focus:outline-none text-gray-700 font-medium" value={tipo} onChange={e => setTipo(e.target.value)}>
-            <option value="">Capital + Interior</option>
-            <option value="CAPITAL">Capital</option>
-            <option value="INTERIOR">Interior</option>
-          </select>
-        </div>
-      </div>
-      <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-        <table className="min-w-full text-sm border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200">
-              <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider min-w-[160px] border-r border-gray-200">Cidade</th>
-              <th className="px-2 py-3 text-right text-xs font-bold text-gray-500 uppercase min-w-[50px]">Cong.</th>
-              {MESES_S.slice(1).map((m, i) => (
-                <th key={i} className="px-1 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[60px]">{m}</th>
-              ))}
-              <th className="px-3 py-3 text-right text-xs font-bold text-blue-700 uppercase tracking-wider min-w-[90px] border-l border-gray-200">Total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {linhas.map((linha, idx) => (
-              <tr key={linha.cidade} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                <td className="sticky left-0 z-10 bg-inherit px-4 py-2.5 font-semibold text-gray-800 border-r border-gray-200 whitespace-nowrap">{linha.cidade}</td>
-                <td className="px-2 py-2.5 text-center text-xs text-gray-400">{linha.qtdCongregacoes}</td>
-                {KEYS.map((k, i) => {
-                  const v = linha[k] || 0;
-                  return <td key={i} className={`px-1 py-2.5 text-right text-xs whitespace-nowrap ${v === 0 ? 'text-gray-200' : 'text-gray-700 font-medium'}`}>{v === 0 ? '—' : fmtK(v)}</td>;
-                })}
-                <td className="px-3 py-2.5 text-right font-bold text-blue-700 border-l border-gray-200 whitespace-nowrap">{linha.total > 0 ? fmtK(linha.total) : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="bg-blue-600 text-white">
-              <td className="sticky left-0 z-10 bg-blue-600 px-4 py-3 font-bold text-sm border-r border-blue-500">TOTAL GERAL</td>
-              <td className="px-2 py-3 text-center text-xs opacity-60">{linhas.reduce((s, l) => s + l.qtdCongregacoes, 0)}</td>
-              {totaisCol.map((t, i) => (
-                <td key={i} className={`px-1 py-3 text-right text-xs font-semibold whitespace-nowrap ${t === 0 ? 'opacity-40' : ''}`}>{t === 0 ? '—' : fmtK(t)}</td>
-              ))}
-              <td className="px-3 py-3 text-right font-bold border-l border-blue-500 whitespace-nowrap">{fmtK(totalGeral)}</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 // ── Modal Nova Congregação ────────────────────────────────────────────────────
 function ModalNovaCongregacao({ open, onClose }) {
   const { register, handleSubmit, reset, formState: { isSubmitting } } = useForm();
@@ -549,6 +801,7 @@ function ModalNovaCongregacao({ open, onClose }) {
       toast.success('Congregação criada!');
       qc.invalidateQueries(['congregacoes']);
       qc.invalidateQueries(['pivot-congs']);
+      qc.invalidateQueries(['pivot-congs-setor']);
       qc.invalidateQueries(['pivot-cidades']);
       reset();
       onClose();
@@ -611,10 +864,9 @@ export default function Financeiro() {
   const [modalCong, setModalCong] = useState(false);
 
   const ABAS = [
-    { id: 'setores',    label: '🗂️ Por Setor' },
+    { id: 'setores',    label: '🗂️ Setores' },
     { id: 'capital',    label: '🏙️ Capital' },
     { id: 'interior',   label: '🌳 Interior' },
-    { id: 'cidades',    label: '📍 Por Cidade' },
     { id: 'lancamentos',label: '📋 Lançamentos' },
   ];
 
@@ -639,7 +891,7 @@ export default function Financeiro() {
         </div>
       </div>
 
-      {/* Abas */}
+      {/* Abas principais */}
       <div className="flex gap-1 bg-gray-100 rounded-xl p-1 w-fit flex-wrap">
         {ABAS.map(a => (
           <button key={a.id} onClick={() => setAba(a.id)}
@@ -651,10 +903,9 @@ export default function Financeiro() {
       </div>
 
       {/* Conteúdo */}
-      {aba === 'setores'     && <TabPorSetor ano={ano} />}
+      {aba === 'setores'     && <TabRelatorioSetor ano={ano} />}
       {aba === 'capital'     && <TabPorCongregacao ano={ano} tipo="CAPITAL" />}
       {aba === 'interior'    && <TabPorCongregacao ano={ano} tipo="INTERIOR" />}
-      {aba === 'cidades'     && <TabPorCidade ano={ano} />}
       {aba === 'lancamentos' && <TabLancamentos ano={ano} />}
 
       <ModalNovaCongregacao open={modalCong} onClose={() => setModalCong(false)} />
