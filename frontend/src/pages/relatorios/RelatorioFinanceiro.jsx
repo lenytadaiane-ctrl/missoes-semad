@@ -2,10 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../api/client';
 import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
-import SortTh from '../../components/ui/SortTh';
 import Spinner from '../../components/ui/Spinner';
-import { useSortable } from '../../hooks/useSortable';
 
 const MESES_L = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MESES_S = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -213,16 +210,8 @@ function AbaResumoMensal() {
 // ── Por Setores ───────────────────────────────────────────────────────────────
 function AbaSetores() {
   const [ano, setAno] = useState(String(anoAtual));
-  const [sub, setSub] = useState('ranking');
-  const [mes, setMes] = useState('');
+  const [sub, setSub] = useState('panorama');
   const [setorSel, setSetorSel] = useState('');
-
-  // Ranking data
-  const { data: dataRank, isLoading: loadRank } = useQuery({
-    queryKey: ['rel-financeiro-setores', ano, mes],
-    queryFn: () => api.get('/relatorios/financeiro/setores', { params: { ano, mes: mes || undefined } }).then(r => r.data),
-    enabled: sub === 'ranking',
-  });
 
   // Pivot data (panorama + individual)
   const { data: dataPivot, isLoading: loadPivot } = useQuery({
@@ -239,13 +228,8 @@ function AbaSetores() {
   });
 
   const linhasPivot = dataPivot?.linhas || [];
-  const labelPeriodo = mes ? `${MESES_L[parseInt(mes)]}/${ano}` : `Ano ${ano}`;
-
-  const { sorted, sortKey, sortDir, toggleSort } = useSortable(dataRank?.setores, 'total', 'desc');
-  const thProps = { current: sortKey, dir: sortDir, onSort: toggleSort };
 
   const SUB = [
-    { id: 'ranking',   label: '📋 Ranking' },
     { id: 'panorama',  label: '📊 Panorama Anual' },
     { id: 'individual',label: '🔍 Setor Individual' },
   ];
@@ -255,12 +239,6 @@ function AbaSetores() {
       <div className="flex flex-wrap items-center gap-3 no-print">
         <AnoSelect ano={ano} setAno={setAno} />
         <SubNav itens={SUB} ativo={sub} setAtivo={setSub} />
-        {sub === 'ranking' && (
-          <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={mes} onChange={e => setMes(e.target.value)}>
-            <option value="">Ano todo</option>
-            {MESES_L.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-          </select>
-        )}
         {sub === 'individual' && (
           <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={setorSel} onChange={e => setSetorSel(e.target.value)}>
             <option value="">Selecione um setor...</option>
@@ -269,70 +247,6 @@ function AbaSetores() {
         )}
         <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
       </div>
-
-      {/* RANKING */}
-      {sub === 'ranking' && (
-        <>
-          <div className="flex flex-wrap gap-4 text-sm bg-blue-50 border border-blue-200 rounded-xl px-5 py-3">
-            <span className="text-blue-700">Total Geral: <strong className="text-blue-900">{fmt(dataRank?.totalGeral || 0)}</strong></span>
-            <span className="text-blue-700">Capital: <strong className="text-blue-900">{fmt(dataRank?.totalCapital || 0)}</strong></span>
-            <span className="text-blue-700">Interior: <strong className="text-blue-900">{fmt(dataRank?.totalInterior || 0)}</strong></span>
-            <span className="text-blue-700">Período: <strong className="text-blue-900">{labelPeriodo}</strong></span>
-          </div>
-          <div className="print-area bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase w-8">#</th>
-                  <SortTh label="Setor" sortKey="nome" {...thProps} />
-                  <SortTh label="Tipo" sortKey="tipo" {...thProps} />
-                  <SortTh label="Capital" sortKey="capital" {...thProps} />
-                  <SortTh label="Interior" sortKey="interior" {...thProps} />
-                  <SortTh label="Total" sortKey="total" {...thProps} />
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">%</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loadRank ? <tr><td colSpan={7} className="py-8 text-center text-gray-400">Carregando...</td></tr>
-                  : (sorted || []).map((s, i) => {
-                    const pct = dataRank?.totalGeral > 0 ? (s.total / dataRank.totalGeral * 100) : 0;
-                    return (
-                      <tr key={s.id} className={`hover:bg-gray-50 ${s.total === 0 ? 'opacity-40' : ''}`}>
-                        <td className="px-4 py-2.5 text-gray-400 text-xs">{s.total > 0 ? `${i+1}º` : '—'}</td>
-                        <td className="px-4 py-2.5 font-medium text-gray-800">{s.nome}</td>
-                        <td className="px-4 py-2.5"><Badge text={s.tipo} /></td>
-                        <td className="px-4 py-2.5 text-right">{s.capital > 0 ? fmt(s.capital) : <span className="text-gray-300">—</span>}</td>
-                        <td className="px-4 py-2.5 text-right">{s.interior > 0 ? fmt(s.interior) : <span className="text-gray-300">—</span>}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold">{s.total > 0 ? fmt(s.total) : <span className="text-gray-300">—</span>}</td>
-                        <td className="px-4 py-2.5 text-right">
-                          {pct > 0 ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="w-16 bg-gray-100 rounded-full h-1.5 hidden sm:block">
-                                <div className="bg-blue-500 h-1.5 rounded-full" style={{ width: `${Math.min(pct, 100)}%` }} />
-                              </div>
-                              <span className="text-xs text-gray-500">{pct.toFixed(1)}%</span>
-                            </div>
-                          ) : <span className="text-gray-300 text-xs">—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-              {dataRank && (
-                <tfoot className="bg-gray-50 border-t-2 border-gray-300">
-                  <tr>
-                    <td colSpan={3} className="px-4 py-3 font-bold">TOTAL — {labelPeriodo}</td>
-                    <td className="px-4 py-3 text-right font-bold">{fmt(dataRank.totalCapital || 0)}</td>
-                    <td className="px-4 py-3 text-right font-bold">{fmt(dataRank.totalInterior || 0)}</td>
-                    <td className="px-4 py-3 text-right font-bold text-blue-700">{fmt(dataRank.totalGeral || 0)}</td>
-                    <td className="px-4 py-3 text-right text-xs text-gray-500">100%</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        </>
-      )}
 
       {/* PANORAMA */}
       {sub === 'panorama' && (
@@ -361,42 +275,24 @@ function AbaSetores() {
 // ── Por Congregações ──────────────────────────────────────────────────────────
 function AbaCongregacoes() {
   const [ano, setAno]       = useState(String(anoAtual));
-  const [sub, setSub]       = useState('ranking');
-  const [mes, setMes]       = useState('');
+  const [sub, setSub]       = useState('panorama');
   const [setorId, setSetorId] = useState('');
   const [tipo, setTipo]     = useState('');
   const [congSel, setCongSel] = useState('');
-  const [ocultarSem, setOcultarSem] = useState(false);
 
   const { data: setores = [] } = useQuery({ queryKey: ['setores'], queryFn: () => api.get('/setores').then(r => r.data) });
-
-  // Ranking data
-  const { data: dataRank, isLoading: loadRank } = useQuery({
-    queryKey: ['rel-financeiro-congs', ano, mes, setorId, tipo],
-    queryFn: () => api.get('/relatorios/financeiro/congregacoes', {
-      params: { ano, mes: mes || undefined, setorId: setorId || undefined, tipo: tipo || undefined },
-    }).then(r => r.data),
-    enabled: sub === 'ranking',
-  });
 
   // Pivot data
   const { data: dataPivot, isLoading: loadPivot } = useQuery({
     queryKey: ['pivot-congs-rel', ano, tipo],
     queryFn: () => api.get('/ofertas-missionarias/pivot/congregacoes', { params: { ano, tipo: tipo || undefined } }).then(r => r.data),
-    enabled: sub === 'panorama' || sub === 'individual',
   });
 
   const linhasPivot = dataPivot?.linhas || [];
   const linhasFiltradas = setorId ? linhasPivot.filter(l => String(l.setorId) === setorId) : linhasPivot;
   const congSelecionada = linhasPivot.find(l => String(l.id) === congSel);
-  const labelPeriodo = mes ? `${MESES_L[parseInt(mes)]}/${ano}` : `Ano ${ano}`;
-
-  const base = ocultarSem ? (dataRank?.congregacoes || []).filter(c => c.total > 0) : (dataRank?.congregacoes || []);
-  const { sorted, sortKey, sortDir, toggleSort } = useSortable(base, 'total', 'desc');
-  const thProps = { current: sortKey, dir: sortDir, onSort: toggleSort };
 
   const SUB = [
-    { id: 'ranking',   label: '📋 Ranking' },
     { id: 'panorama',  label: '📊 Panorama Anual' },
     { id: 'individual',label: '🔍 Congregação Individual' },
   ];
@@ -411,23 +307,11 @@ function AbaCongregacoes() {
           <option value="CAPITAL">Capital</option>
           <option value="INTERIOR">Interior</option>
         </select>
-        {(sub === 'ranking' || sub === 'panorama') && (tipo === 'CAPITAL' || !tipo) && (
+        {sub === 'panorama' && (tipo === 'CAPITAL' || !tipo) && (
           <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={setorId} onChange={e => setSetorId(e.target.value)}>
             <option value="">Todos os setores</option>
             {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
           </select>
-        )}
-        {sub === 'ranking' && (
-          <>
-            <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={mes} onChange={e => setMes(e.target.value)}>
-              <option value="">Ano todo</option>
-              {MESES_L.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
-            </select>
-            <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer border border-gray-300 rounded-lg px-3 py-2">
-              <input type="checkbox" checked={ocultarSem} onChange={e => setOcultarSem(e.target.checked)} className="accent-blue-600" />
-              Só com oferta
-            </label>
-          </>
         )}
         {sub === 'individual' && (
           <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={congSel} onChange={e => setCongSel(e.target.value)}>
@@ -438,68 +322,6 @@ function AbaCongregacoes() {
         <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
       </div>
 
-      {/* RANKING */}
-      {sub === 'ranking' && (
-        <>
-          <div className="flex flex-wrap gap-4 text-sm bg-blue-50 border border-blue-200 rounded-xl px-5 py-3">
-            <span className="text-blue-700">Total: <strong className="text-blue-900">{fmt(dataRank?.totalGeral || 0)}</strong></span>
-            <span className="text-blue-700">Com oferta: <strong className="text-emerald-700">{(dataRank?.congregacoes || []).filter(c => c.total > 0).length}</strong></span>
-            <span className="text-blue-700">Sem oferta: <strong className="text-amber-700">{(dataRank?.congregacoes || []).filter(c => c.total === 0).length}</strong></span>
-            <span className="text-blue-700">Exibindo: <strong className="text-blue-900">{sorted.length}</strong></span>
-          </div>
-          <div className="print-area bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase w-8">#</th>
-                  <SortTh label="Congregação" sortKey="nome" {...thProps} />
-                  <SortTh label="Setor" sortKey="setor" {...thProps} />
-                  <SortTh label="Tipo" sortKey="tipo" {...thProps} />
-                  <SortTh label={`Total — ${labelPeriodo}`} sortKey="total" {...thProps} />
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">%</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loadRank ? <tr><td colSpan={6} className="py-8 text-center text-gray-400">Carregando...</td></tr>
-                  : sorted.map((c, i) => {
-                    const pct = dataRank?.totalGeral > 0 ? (c.total / dataRank.totalGeral * 100) : 0;
-                    return (
-                      <tr key={c.id} className={`hover:bg-gray-50 ${c.total === 0 ? 'opacity-40' : ''}`}>
-                        <td className="px-4 py-2.5 text-gray-400 text-xs">{c.total > 0 ? `${i+1}º` : '—'}</td>
-                        <td className="px-4 py-2.5 font-medium text-gray-800">{c.nome}</td>
-                        <td className="px-4 py-2.5 text-gray-500 text-xs">{c.setor || '—'}</td>
-                        <td className="px-4 py-2.5"><Badge text={c.tipo} /></td>
-                        <td className="px-4 py-2.5 text-right font-semibold">
-                          {c.total > 0 ? fmt(c.total) : <span className="text-gray-300 text-xs font-normal">sem oferta</span>}
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                          {pct > 0 ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="w-16 bg-gray-100 rounded-full h-1.5 hidden sm:block">
-                                <div className={`h-1.5 rounded-full ${c.tipo === 'CAPITAL' ? 'bg-blue-500' : 'bg-violet-500'}`} style={{ width: `${Math.min(pct * 5, 100)}%` }} />
-                              </div>
-                              <span className="text-xs text-gray-500">{pct.toFixed(2)}%</span>
-                            </div>
-                          ) : <span className="text-gray-300 text-xs">—</span>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-              {dataRank && (
-                <tfoot className="bg-gray-50 border-t-2 border-gray-300">
-                  <tr>
-                    <td colSpan={4} className="px-4 py-3 font-bold">TOTAL — {labelPeriodo}</td>
-                    <td className="px-4 py-3 text-right font-bold text-blue-700">{fmt(dataRank.totalGeral || 0)}</td>
-                    <td className="px-4 py-3 text-right text-xs text-gray-500">100%</td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-            <div className="px-4 py-2 text-xs text-gray-400 border-t">{sorted.length} congregação(ões)</div>
-          </div>
-        </>
-      )}
 
       {/* PANORAMA */}
       {sub === 'panorama' && (
