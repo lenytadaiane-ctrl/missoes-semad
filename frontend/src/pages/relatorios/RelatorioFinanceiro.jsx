@@ -210,8 +210,10 @@ function AbaResumoMensal() {
 // ── Por Setores ───────────────────────────────────────────────────────────────
 function AbaSetores() {
   const [ano, setAno] = useState(String(anoAtual));
+  const [mes, setMes] = useState('');
   const [sub, setSub] = useState('panorama');
   const [setorSel, setSetorSel] = useState('');
+  const colunas = mes ? [`m${mes}`] : KEYS;
 
   // Pivot data (panorama + individual)
   const { data: dataPivot, isLoading: loadPivot } = useQuery({
@@ -238,6 +240,10 @@ function AbaSetores() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 no-print">
         <AnoSelect ano={ano} setAno={setAno} />
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={mes} onChange={e => setMes(e.target.value)}>
+          <option value="">Ano todo</option>
+          {MESES_L.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+        </select>
         <SubNav itens={SUB} ativo={sub} setAtivo={setSub} />
         {sub === 'individual' && (
           <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={setorSel} onChange={e => setSetorSel(e.target.value)}>
@@ -250,7 +256,7 @@ function AbaSetores() {
 
       {/* PANORAMA */}
       {sub === 'panorama' && (
-        <PivotRelatorio linhas={linhasPivot} loading={loadPivot} />
+        <PivotRelatorio linhas={linhasPivot} colunas={colunas} loading={loadPivot} />
       )}
 
       {/* SETOR INDIVIDUAL */}
@@ -265,7 +271,7 @@ function AbaSetores() {
               <span className="ml-2 text-blue-600">· Total {ano}: <strong className="text-blue-900">{fmt(linhasPivot.find(s => String(s.id) === setorSel)?.total || 0)}</strong></span>
             </div>
           )}
-          <PivotRelatorio linhas={dataCongsSel?.linhas || []} loading={loadCongsSel} />
+          <PivotRelatorio linhas={dataCongsSel?.linhas || []} colunas={colunas} loading={loadCongsSel} />
         </>
       )}
     </div>
@@ -275,10 +281,12 @@ function AbaSetores() {
 // ── Por Congregações ──────────────────────────────────────────────────────────
 function AbaCongregacoes() {
   const [ano, setAno]       = useState(String(anoAtual));
+  const [mes, setMes]       = useState('');
   const [sub, setSub]       = useState('panorama');
   const [setorId, setSetorId] = useState('');
   const [tipo, setTipo]     = useState('');
   const [congSel, setCongSel] = useState('');
+  const colunas = mes ? [`m${mes}`] : KEYS;
 
   const { data: setores = [] } = useQuery({ queryKey: ['setores'], queryFn: () => api.get('/setores').then(r => r.data) });
 
@@ -301,6 +309,10 @@ function AbaCongregacoes() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 no-print">
         <AnoSelect ano={ano} setAno={setAno} />
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={mes} onChange={e => setMes(e.target.value)}>
+          <option value="">Ano todo</option>
+          {MESES_L.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+        </select>
         <SubNav itens={SUB} ativo={sub} setAtivo={setSub} />
         <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={tipo} onChange={e => { setTipo(e.target.value); setSetorId(''); setCongSel(''); }}>
           <option value="">Capital + Interior</option>
@@ -325,7 +337,7 @@ function AbaCongregacoes() {
 
       {/* PANORAMA */}
       {sub === 'panorama' && (
-        <PivotRelatorio linhas={linhasFiltradas} loading={loadPivot} agrupador={tipo === 'INTERIOR' ? 'cidade' : 'setor'} />
+        <PivotRelatorio linhas={linhasFiltradas} colunas={colunas} loading={loadPivot} agrupador={tipo === 'INTERIOR' ? 'cidade' : 'setor'} />
       )}
 
       {/* INDIVIDUAL */}
@@ -381,8 +393,10 @@ function AbaCongregacoes() {
 // ── Cidades do Interior ───────────────────────────────────────────────────────
 function AbaCidadesInterior() {
   const [ano, setAno]         = useState(String(anoAtual));
+  const [mes, setMes]         = useState('');
   const [sub, setSub]         = useState('panorama');
   const [cidadeSel, setCidadeSel] = useState('');
+  const colunas = mes ? [`m${mes}`] : KEYS;
 
   const { data, isLoading } = useQuery({
     queryKey: ['pivot-interior-rel', ano],
@@ -414,6 +428,10 @@ function AbaCidadesInterior() {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3 no-print">
         <AnoSelect ano={ano} setAno={setAno} />
+        <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={mes} onChange={e => setMes(e.target.value)}>
+          <option value="">Ano todo</option>
+          {MESES_L.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+        </select>
         <SubNav itens={SUB} ativo={sub} setAtivo={setSub} />
         {sub === 'cidade' && (
           <select className="border border-gray-300 rounded-lg px-3 py-2 text-sm" value={cidadeSel} onChange={e => setCidadeSel(e.target.value)}>
@@ -431,7 +449,7 @@ function AbaCidadesInterior() {
             <span className="text-violet-700">Cidades: <strong className="text-violet-900">{cidades.length}</strong></span>
             <span className="text-violet-700">Congregações: <strong className="text-violet-900">{todasLinhas.length}</strong></span>
           </div>
-          <PivotRelatorio linhas={linhasCidades} loading={isLoading} />
+          <PivotRelatorio linhas={linhasCidades} colunas={colunas} loading={isLoading} />
         </>
       )}
 
@@ -445,7 +463,7 @@ function AbaCidadesInterior() {
             <p className="text-xs text-violet-600 mt-0.5">{linhasCidadeSel.length} congregação(ões)</p>
             <p className="font-bold text-violet-900 mt-1">Total {ano}: {fmt(linhasCidadeSel.reduce((s, l) => s + (parseFloat(l.total) || 0), 0))}</p>
           </div>
-          <PivotRelatorio linhas={linhasCidadeSel} loading={isLoading} />
+          <PivotRelatorio linhas={linhasCidadeSel} colunas={colunas} loading={isLoading} />
         </>
       )}
     </div>
