@@ -1,8 +1,52 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import api from '../../api/client';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
+
+async function capturarCanvas(ref) {
+  return html2canvas(ref.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+}
+
+async function exportarImagem(ref, nomeArquivo = 'relatorio.png') {
+  if (!ref.current) return;
+  const canvas = await capturarCanvas(ref);
+  const link = document.createElement('a');
+  link.download = nomeArquivo;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+async function exportarPDF(ref, nomeArquivo = 'relatorio.pdf') {
+  if (!ref.current) return;
+  const canvas = await capturarCanvas(ref);
+  const imgData = canvas.toDataURL('image/png');
+  const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'landscape' : 'portrait', unit: 'px', format: [canvas.width / 2, canvas.height / 2] });
+  pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+  pdf.save(nomeArquivo);
+}
+
+function BotoesExportar({ refArea, prefixo }) {
+  const [carregando, setCarregando] = useState(false);
+  const handle = async (fn, ext) => {
+    setCarregando(ext);
+    try { await fn(refArea, `${prefixo}.${ext}`); } finally { setCarregando(false); }
+  };
+  return (
+    <>
+      <button onClick={() => handle(exportarImagem, 'png')} disabled={!!carregando}
+        className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors">
+        {carregando === 'png' ? '...' : '📷'} Imagem
+      </button>
+      <button onClick={() => handle(exportarPDF, 'pdf')} disabled={!!carregando}
+        className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors">
+        {carregando === 'pdf' ? '...' : '📄'} PDF
+      </button>
+    </>
+  );
+}
 
 const MESES_L = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MESES_S = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
@@ -140,6 +184,7 @@ function PivotRelatorio({ linhas, colunas = KEYS, agrupador = null, loading }) {
 function AbaResumoMensal() {
   const [ano, setAno] = useState(String(anoAtual));
   const [mes, setMes] = useState('');
+  const areaRef = useRef(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['rel-financeiro', ano],
@@ -158,10 +203,12 @@ function AbaResumoMensal() {
             <option value="">Ano todo</option>
             {MESES_L.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
           </select>
+          <BotoesExportar refArea={areaRef} prefixo={`relatorio-mensal-${ano}${mes ? '-' + MESES_L[mes] : ''}`} />
           <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
         </div>
       </div>
 
+      <div ref={areaRef} className="space-y-4">
       <div className="flex flex-wrap gap-4 text-sm bg-blue-50 border border-blue-200 rounded-xl px-5 py-3">
         {data?.entradaAnual && <span className="text-blue-700">Entrada Oficial {ano}: <strong className="text-blue-900">{fmt(data.entradaAnual.valor)}</strong></span>}
         <span className="text-blue-700">Arrecadado de Ofertas: <strong className="text-blue-900">{fmt(data?.totalAno || 0)}</strong></span>
@@ -203,6 +250,7 @@ function AbaResumoMensal() {
           )}
         </table>
       </div>
+      </div>
     </div>
   );
 }
@@ -214,6 +262,9 @@ function AbaSetores() {
   const [sub, setSub] = useState('panorama');
   const [setorSel, setSetorSel] = useState('');
   const colunas = mes ? [`m${mes}`] : KEYS;
+  const areaRef = useRef(null);
+  const labelMes = mes ? MESES_L[parseInt(mes)] : '';
+  const prefixoArq = `relatorio-setores${setorSel ? '-setor' : ''}${labelMes ? '-' + labelMes : ''}-${ano}`;
 
   // Pivot data (panorama + individual)
   const { data: dataPivot, isLoading: loadPivot } = useQuery({
@@ -251,9 +302,11 @@ function AbaSetores() {
             {linhasPivot.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
           </select>
         )}
+        <BotoesExportar refArea={areaRef} prefixo={prefixoArq} />
         <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
       </div>
 
+      <div ref={areaRef} className="space-y-3">
       {/* PANORAMA */}
       {sub === 'panorama' && (
         <PivotRelatorio linhas={linhasPivot} colunas={colunas} loading={loadPivot} />
@@ -274,6 +327,7 @@ function AbaSetores() {
           <PivotRelatorio linhas={dataCongsSel?.linhas || []} colunas={colunas} loading={loadCongsSel} />
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -287,6 +341,9 @@ function AbaCongregacoes() {
   const [tipo, setTipo]     = useState('');
   const [congSel, setCongSel] = useState('');
   const colunas = mes ? [`m${mes}`] : KEYS;
+  const areaRef = useRef(null);
+  const labelMes = mes ? MESES_L[parseInt(mes)] : '';
+  const prefixoArq = `relatorio-congregacoes${labelMes ? '-' + labelMes : ''}-${ano}`;
 
   const { data: setores = [] } = useQuery({ queryKey: ['setores'], queryFn: () => api.get('/setores').then(r => r.data) });
 
@@ -331,10 +388,11 @@ function AbaCongregacoes() {
             {linhasPivot.map(c => <option key={c.id} value={c.id}>{c.nome}{c.cidade ? ` (${c.cidade})` : ''}</option>)}
           </select>
         )}
+        <BotoesExportar refArea={areaRef} prefixo={prefixoArq} />
         <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
       </div>
 
-
+      <div ref={areaRef} className="space-y-3">
       {/* PANORAMA */}
       {sub === 'panorama' && (
         <PivotRelatorio linhas={linhasFiltradas} colunas={colunas} loading={loadPivot} agrupador={tipo === 'INTERIOR' ? 'cidade' : 'setor'} />
@@ -386,6 +444,7 @@ function AbaCongregacoes() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -397,6 +456,9 @@ function AbaCidadesInterior() {
   const [sub, setSub]         = useState('panorama');
   const [cidadeSel, setCidadeSel] = useState('');
   const colunas = mes ? [`m${mes}`] : KEYS;
+  const areaRef = useRef(null);
+  const labelMes = mes ? MESES_L[parseInt(mes)] : '';
+  const prefixoArq = `relatorio-interior${cidadeSel ? '-' + cidadeSel : ''}${labelMes ? '-' + labelMes : ''}-${ano}`;
 
   const { data, isLoading } = useQuery({
     queryKey: ['pivot-interior-rel', ano],
@@ -439,9 +501,11 @@ function AbaCidadesInterior() {
             {cidades.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         )}
+        <BotoesExportar refArea={areaRef} prefixo={prefixoArq} />
         <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
       </div>
 
+      <div ref={areaRef} className="space-y-3">
       {sub === 'panorama' && (
         <>
           <div className="flex flex-wrap gap-4 text-sm bg-violet-50 border border-violet-200 rounded-xl px-5 py-3">
@@ -466,6 +530,7 @@ function AbaCidadesInterior() {
           <PivotRelatorio linhas={linhasCidadeSel} colunas={colunas} loading={isLoading} />
         </>
       )}
+      </div>
     </div>
   );
 }
