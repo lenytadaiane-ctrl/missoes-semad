@@ -757,8 +757,8 @@ function ModalImportacao({ open, onClose, ano, onImportado }) {
   const linhasSelecionadas = linhasEdit.filter(l => !l._skip && l.congregacaoId).length;
 
   return (
-    <Modal open={open} onClose={handleClose} title="Importar Ofertas por Arquivo">
-      <div className="space-y-4 min-w-[600px] max-w-full">
+    <Modal open={open} onClose={handleClose} title="Importar Ofertas por Arquivo" size="xl">
+      <div className="space-y-4">
         {!preview ? (
           <>
             <p className="text-sm text-gray-500">

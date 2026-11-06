@@ -246,26 +246,56 @@ async function parsearExcel(buffer) {
   const xlsx = require('xlsx');
   const wb = xlsx.read(buffer, { type: 'buffer' });
   const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
-  const linhas = [];
-  for (const row of rows) {
-    const cols = Object.keys(row);
-    // Heurística: a coluna "nome/congregação" é texto, a coluna "valor" é número/moeda
-    let nome = null, valor = null;
-    for (const col of cols) {
-      const v = row[col];
-      const colNorm = normalizar(col);
-      if (!nome && (colNorm.includes('nome') || colNorm.includes('congreg') || colNorm.includes('igreja') || colNorm.includes('local'))) {
-        nome = String(v).trim();
-      }
-      if (!valor && (colNorm.includes('valor') || colNorm.includes('ofert') || colNorm.includes('total'))) {
-        valor = parsearValorBR(v);
-      }
+  // header:1 retorna arrays brutos (sem depender de cabeçalhos)
+  const rawRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  if (rawRows.length === 0) return [];
+
+  // Detecta a linha de cabeçalho (primeira linha não-vazia)
+  let headerRow = -1;
+  for (let i = 0; i < Math.min(rawRows.length, 5); i++) {
+    if (rawRows[i].some(c => c !== '')) { headerRow = i; break; }
+  }
+  if (headerRow === -1) return [];
+
+  const headers = rawRows[headerRow].map(h => normalizar(String(h)));
+  const dataRows = rawRows.slice(headerRow + 1).filter(r => r.some(c => c !== ''));
+
+  // Detecta coluna de nome: 1) por cabeçalho, 2) por conteúdo (coluna com strings longas)
+  const nomeKeywords = ['nome', 'congreg', 'igreja', 'local', 'cidade', 'setor', 'descric', 'descri'];
+  const valorKeywords = ['valor', 'ofert', 'total', 'receit', 'arrecad', 'quantia', 'mont'];
+
+  let colunaNomel = headers.findIndex(h => nomeKeywords.some(k => h.includes(k)));
+  let colunaValor = headers.findIndex(h => valorKeywords.some(k => h.includes(k)));
+
+  // Fallback: detecta por tipo de dado das primeiras linhas
+  if (colunaNomel === -1 || colunaValor === -1) {
+    const amostra = dataRows.slice(0, 10);
+    const numCols = Math.max(...amostra.map(r => r.length), 0);
+    const scores = Array.from({ length: numCols }, (_, i) => {
+      const vals = amostra.map(r => r[i]).filter(v => v !== '');
+      const numCount = vals.filter(v => parsearValorBR(v) !== null && parsearValorBR(v) > 0).length;
+      const textCount = vals.filter(v => typeof v === 'string' && v.trim().length > 3).length;
+      return { i, numCount, textCount };
+    });
+    if (colunaNomel === -1) {
+      const best = scores.filter(s => s.i !== colunaValor).sort((a, b) => b.textCount - a.textCount)[0];
+      if (best && best.textCount > 0) colunaNomel = best.i;
     }
-    // fallback: primeira coluna como nome, segunda como valor
-    if (!nome && cols.length >= 1) nome = String(row[cols[0]]).trim();
-    if (!valor && cols.length >= 2) valor = parsearValorBR(row[cols[1]]);
-    if (nome && valor !== null && valor > 0) linhas.push({ nome, valor });
+    if (colunaValor === -1) {
+      const best = scores.filter(s => s.i !== colunaNomel).sort((a, b) => b.numCount - a.numCount)[0];
+      if (best && best.numCount > 0) colunaValor = best.i;
+    }
+  }
+
+  if (colunaNomel === -1 || colunaValor === -1) return [];
+
+  const linhas = [];
+  for (const row of dataRows) {
+    const nome = String(row[colunaNomel] || '').trim();
+    const valor = parsearValorBR(row[colunaValor]);
+    if (nome && nome.length >= 2 && valor !== null && valor > 0) {
+      linhas.push({ nome, valor });
+    }
   }
   return linhas;
 }
@@ -294,18 +324,29 @@ async function importarPreview(req, res, next) {
     const { mesReferencia, anoReferencia } = req.body;
     if (!mesReferencia || !anoReferencia) return res.status(400).json({ error: 'Informe mês e ano de referência' });
 
-    const mime = req.file.mimetype;
-    const originalname = req.file.originalname.toLowerCase();
+    const mime = req.file.mimetype || '';
+    const originalname = (req.file.originalname || '').toLowerCase();
+    console.log(`[importar] arquivo: ${req.file.originalname}, mime: ${mime}, size: ${req.file.size}`);
+
     let linhasBruto = [];
-    if (mime.includes('spreadsheet') || mime.includes('excel') || originalname.endsWith('.xlsx') || originalname.endsWith('.xls') || originalname.endsWith('.csv')) {
+    const isExcel = mime.includes('spreadsheet') || mime.includes('excel') || mime.includes('sheet') ||
+      originalname.endsWith('.xlsx') || originalname.endsWith('.xls') || originalname.endsWith('.csv') ||
+      mime === 'application/octet-stream';
+    const isPDF = mime.includes('pdf') || originalname.endsWith('.pdf');
+
+    if (isExcel && !isPDF) {
       linhasBruto = await parsearExcel(req.file.buffer);
-    } else if (mime.includes('pdf') || originalname.endsWith('.pdf')) {
+      console.log(`[importar] Excel: ${linhasBruto.length} linhas extraídas`);
+    } else if (isPDF) {
       linhasBruto = await parsearPDF(req.file.buffer);
+      console.log(`[importar] PDF: ${linhasBruto.length} linhas extraídas`);
     } else {
-      return res.status(400).json({ error: 'Formato não suportado. Use Excel (.xlsx, .xls) ou PDF.' });
+      return res.status(400).json({ error: `Formato não suportado (${mime || originalname}). Use Excel (.xlsx, .xls) ou PDF.` });
     }
 
-    if (linhasBruto.length === 0) return res.status(422).json({ error: 'Nenhuma linha com nome+valor encontrada no arquivo.' });
+    if (linhasBruto.length === 0) return res.status(422).json({
+      error: 'Nenhuma linha com nome+valor encontrada no arquivo. Verifique se a planilha tem colunas de congregação e valor.',
+    });
 
     const congregacoes = await prisma.congregacao.findMany({ include: { setor: true } });
 
