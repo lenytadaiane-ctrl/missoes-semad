@@ -7,7 +7,39 @@ import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 
 async function capturarCanvas(ref) {
-  return html2canvas(ref.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+  const el = ref.current;
+
+  // Encolhe o container ao tamanho do conteúdo para evitar espaço em branco
+  const prevDisplay = el.style.display;
+  const prevWidth   = el.style.width;
+  el.style.display  = 'inline-block';
+  el.style.width    = 'auto';
+
+  // Remove min-w-full das tabelas internas para que sigam o container
+  const tables = el.querySelectorAll('table');
+  const tableMinWidths = [];
+  tables.forEach(t => {
+    tableMinWidths.push(t.style.minWidth);
+    t.style.minWidth = 'unset';
+  });
+
+  // Remove largura fixa dos wrappers overflow-x-auto
+  const overflows = el.querySelectorAll('.overflow-x-auto');
+  const overflowWidths = [];
+  overflows.forEach(o => {
+    overflowWidths.push(o.style.width);
+    o.style.width = 'fit-content';
+  });
+
+  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+
+  // Restaura estilos originais
+  el.style.display = prevDisplay;
+  el.style.width   = prevWidth;
+  tables.forEach((t, i) => { t.style.minWidth = tableMinWidths[i]; });
+  overflows.forEach((o, i) => { o.style.width = overflowWidths[i]; });
+
+  return canvas;
 }
 
 async function exportarImagem(ref, nomeArquivo = 'relatorio.png') {
