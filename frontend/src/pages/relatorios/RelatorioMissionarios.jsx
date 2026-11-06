@@ -1,10 +1,47 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import api from '../../api/client';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import SortTh from '../../components/ui/SortTh';
 import { useSortable } from '../../hooks/useSortable';
+
+async function capturarCanvas(ref) {
+  const el = ref.current;
+  const prevDisplay = el.style.display, prevWidth = el.style.width;
+  el.style.display = 'inline-block'; el.style.width = 'auto';
+  const tables = el.querySelectorAll('table'); const tw = [];
+  tables.forEach(t => { tw.push(t.style.minWidth); t.style.minWidth = 'unset'; });
+  const ov = el.querySelectorAll('.overflow-x-auto'); const ow = [];
+  ov.forEach(o => { ow.push(o.style.width); o.style.width = 'fit-content'; });
+  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+  el.style.display = prevDisplay; el.style.width = prevWidth;
+  tables.forEach((t, i) => { t.style.minWidth = tw[i]; });
+  ov.forEach((o, i) => { o.style.width = ow[i]; });
+  return canvas;
+}
+async function exportarImagem(ref, nome = 'relatorio.png') {
+  if (!ref.current) return;
+  const c = await capturarCanvas(ref);
+  const a = document.createElement('a'); a.download = nome; a.href = c.toDataURL('image/png'); a.click();
+}
+async function exportarPDF(ref, nome = 'relatorio.pdf') {
+  if (!ref.current) return;
+  const c = await capturarCanvas(ref);
+  const pdf = new jsPDF({ orientation: c.width > c.height ? 'landscape' : 'portrait', unit: 'px', format: [c.width / 2, c.height / 2] });
+  pdf.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, c.width / 2, c.height / 2);
+  pdf.save(nome);
+}
+function BotoesExportar({ refArea, prefixo }) {
+  const [car, setCar] = useState(false);
+  const run = async (fn, ext) => { setCar(ext); try { await fn(refArea, `${prefixo}.${ext}`); } finally { setCar(false); } };
+  return (<>
+    <button onClick={() => run(exportarImagem, 'png')} disabled={!!car} className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors">{car === 'png' ? '...' : '📷'} Imagem</button>
+    <button onClick={() => run(exportarPDF, 'pdf')} disabled={!!car} className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50 disabled:opacity-50 transition-colors">{car === 'pdf' ? '...' : '📄'} PDF</button>
+  </>);
+}
 
 const fmtData = (d) => d ? new Date(d).toLocaleDateString('pt-BR') : '—';
 
@@ -24,6 +61,7 @@ export default function RelatorioMissionarios() {
   const [filtroCampo, setFiltroCampo] = useState('');
   const [mostrarFoto, setMostrarFoto] = useState(true);
   const [modoVisualizacao, setModoVisualizacao] = useState('tabela'); // tabela | cards
+  const areaRef = useRef(null);
 
   const { data: raw = [], isLoading } = useQuery({
     queryKey: ['rel-missionarios'],
@@ -47,7 +85,7 @@ export default function RelatorioMissionarios() {
   const thProps = { current: sortKey, dir: sortDir, onSort: toggleSort };
 
   return (
-    <div className="space-y-4">
+    <div ref={areaRef} className="space-y-4">
       {/* Controles */}
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
         <h1 className="text-2xl font-bold text-gray-800">Relatório de Missionários</h1>
@@ -58,6 +96,7 @@ export default function RelatorioMissionarios() {
           >
             {modoVisualizacao === 'tabela' ? '⊞ Cards' : '☰ Tabela'}
           </button>
+          <BotoesExportar refArea={areaRef} prefixo="relatorio-missionarios" />
           <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
         </div>
       </div>
