@@ -7,39 +7,7 @@ import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 
 async function capturarCanvas(ref) {
-  const el = ref.current;
-
-  // Encolhe o container ao tamanho do conteúdo para evitar espaço em branco
-  const prevDisplay = el.style.display;
-  const prevWidth   = el.style.width;
-  el.style.display  = 'inline-block';
-  el.style.width    = 'auto';
-
-  // Remove min-w-full das tabelas internas para que sigam o container
-  const tables = el.querySelectorAll('table');
-  const tableMinWidths = [];
-  tables.forEach(t => {
-    tableMinWidths.push(t.style.minWidth);
-    t.style.minWidth = 'unset';
-  });
-
-  // Remove largura fixa dos wrappers overflow-x-auto
-  const overflows = el.querySelectorAll('.overflow-x-auto');
-  const overflowWidths = [];
-  overflows.forEach(o => {
-    overflowWidths.push(o.style.width);
-    o.style.width = 'fit-content';
-  });
-
-  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-
-  // Restaura estilos originais
-  el.style.display = prevDisplay;
-  el.style.width   = prevWidth;
-  tables.forEach((t, i) => { t.style.minWidth = tableMinWidths[i]; });
-  overflows.forEach((o, i) => { o.style.width = overflowWidths[i]; });
-
-  return canvas;
+  return html2canvas(ref.current, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
 }
 
 async function exportarImagem(ref, nomeArquivo = 'relatorio.png') {
@@ -116,6 +84,7 @@ function PivotRelatorio({ linhas, colunas = KEYS, agrupador = null, loading }) {
   if (loading) return <div className="flex justify-center py-12"><Spinner size="lg" /></div>;
   if (!linhas || !linhas.length) return <p className="text-center text-gray-400 py-8 text-sm">Nenhum dado encontrado.</p>;
 
+  const compact = colunas.length === 1;
   const grupos = {};
   if (agrupador) {
     linhas.forEach(l => {
@@ -130,8 +99,8 @@ function PivotRelatorio({ linhas, colunas = KEYS, agrupador = null, loading }) {
   const colSpan     = 1 + colunas.length + 1;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm print-area">
-      <table className="min-w-full text-xs border-collapse">
+    <div className={`${compact ? 'w-fit ' : ''}overflow-x-auto rounded-xl border border-gray-200 shadow-sm print-area`}>
+      <table className={`${compact ? 'w-auto' : 'min-w-full'} text-xs border-collapse`}>
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
             <th className="sticky left-0 bg-gray-50 px-3 py-2.5 text-left font-bold text-gray-600 uppercase tracking-wider min-w-[180px] border-r border-gray-200">
@@ -294,6 +263,7 @@ function AbaSetores() {
   const [sub, setSub] = useState('panorama');
   const [setorSel, setSetorSel] = useState('');
   const colunas = mes ? [`m${mes}`] : KEYS;
+  const compact = colunas.length === 1;
   const areaRef = useRef(null);
   const labelMes = mes ? MESES_L[parseInt(mes)] : '';
   const prefixoArq = `relatorio-setores${setorSel ? '-setor' : ''}${labelMes ? '-' + labelMes : ''}-${ano}`;
@@ -338,7 +308,7 @@ function AbaSetores() {
         <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
       </div>
 
-      <div ref={areaRef} className="space-y-3">
+      <div ref={areaRef} className={`space-y-3${compact ? ' w-fit' : ''}`}>
       {/* PANORAMA */}
       {sub === 'panorama' && (
         <PivotRelatorio linhas={linhasPivot} colunas={colunas} loading={loadPivot} />
@@ -373,6 +343,7 @@ function AbaCongregacoes() {
   const [tipo, setTipo]     = useState('');
   const [congSel, setCongSel] = useState('');
   const colunas = mes ? [`m${mes}`] : KEYS;
+  const compact = colunas.length === 1;
   const areaRef = useRef(null);
   const labelMes = mes ? MESES_L[parseInt(mes)] : '';
   const prefixoArq = `relatorio-congregacoes${labelMes ? '-' + labelMes : ''}-${ano}`;
@@ -424,7 +395,7 @@ function AbaCongregacoes() {
         <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
       </div>
 
-      <div ref={areaRef} className="space-y-3">
+      <div ref={areaRef} className={`space-y-3${compact ? ' w-fit' : ''}`}>
       {/* PANORAMA */}
       {sub === 'panorama' && (
         <PivotRelatorio linhas={linhasFiltradas} colunas={colunas} loading={loadPivot} agrupador={tipo === 'INTERIOR' ? 'cidade' : 'setor'} />
@@ -488,6 +459,7 @@ function AbaCidadesInterior() {
   const [sub, setSub]         = useState('panorama');
   const [cidadeSel, setCidadeSel] = useState('');
   const colunas = mes ? [`m${mes}`] : KEYS;
+  const compact = colunas.length === 1;
   const areaRef = useRef(null);
   const labelMes = mes ? MESES_L[parseInt(mes)] : '';
   const prefixoArq = `relatorio-interior${cidadeSel ? '-' + cidadeSel : ''}${labelMes ? '-' + labelMes : ''}-${ano}`;
@@ -537,7 +509,7 @@ function AbaCidadesInterior() {
         <Button variant="secondary" onClick={() => window.print()}>Imprimir</Button>
       </div>
 
-      <div ref={areaRef} className="space-y-3">
+      <div ref={areaRef} className={`space-y-3${compact ? ' w-fit' : ''}`}>
       {sub === 'panorama' && (
         <>
           <div className="flex flex-wrap gap-4 text-sm bg-violet-50 border border-violet-200 rounded-xl px-5 py-3">
