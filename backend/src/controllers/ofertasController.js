@@ -301,20 +301,39 @@ async function parsearExcel(buffer) {
 }
 
 // Parser para "Comparativo de Despesa x Receita" (membrosweb)
-// Linhas: "01-2-021-01-01 - CAMAPUÃ 4.140,00 - 4.140,00 -"
+// Suporta dois layouts: valor na mesma linha OU em linhas separadas
 function parsearFormatoComparativo(text) {
-  const reLinhaData = /^\d{2}-\d-\d{3}-\d{2}-\d{2}\s+-\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})/;
+  const reCode = /^(\d{2}-\d-\d{3}-\d{2}-\d{2})\s+-\s+(.+)/;
+  const reValor = /(\d{1,3}(?:\.\d{3})*,\d{2})/;
   const linhas = [];
-  for (const linha of text.split('\n')) {
-    const trim = linha.trim();
-    if (!trim.match(/^\d{2}-\d-\d{3}/)) continue;
-    const m = trim.match(reLinhaData);
+  const textLines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  for (let i = 0; i < textLines.length; i++) {
+    const m = textLines[i].match(reCode);
     if (!m) continue;
-    const nome = m[1].trim();
-    const valor = parsearValorBR(m[2]);
-    if (!nome || nome.length < 2 || !valor || valor <= 0) continue;
-    linhas.push({ nome, valor });
+
+    let descricao = m[2].trim();
+    let valor = null;
+
+    // Caso 1: valor na mesma linha ("CAMAPUÃ 4.140,00 - ...")
+    const inlineM = descricao.match(/^(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\b/);
+    if (inlineM) {
+      descricao = inlineM[1].trim();
+      valor = parsearValorBR(inlineM[2]);
+    } else {
+      // Caso 2: pdf-parse separou colunas — valor nas próximas linhas
+      for (let j = i + 1; j < Math.min(i + 6, textLines.length); j++) {
+        if (textLines[j].match(/^\d{2}-\d-\d{3}/)) break; // chegou na próxima cidade
+        const vm = textLines[j].match(reValor);
+        if (vm) { valor = parsearValorBR(vm[1]); break; }
+      }
+    }
+
+    if (!descricao || descricao.length < 2 || !valor || valor <= 0) continue;
+    if (/total geral/i.test(descricao)) continue;
+    linhas.push({ nome: descricao, valor });
   }
+  console.log(`[comparativo] ${linhas.length} cidades extraídas`);
   return linhas;
 }
 
@@ -352,10 +371,17 @@ async function parsearPDF(buffer) {
   const pdfParse = require('pdf-parse');
   const data = await pdfParse(buffer);
   const text = data.text;
+  console.log(`[parsearPDF] primeiros 300 chars: ${text.slice(0, 300).replace(/\n/g, '\\n')}`);
 
-  if (/Comparativo de Despesa x Receita/i.test(text)) {
+  // Detecta pelo título OU pela presença do padrão de código de congregação
+  const isComparativo = /Comparativo de Despesa x Receita/i.test(text)
+    || /^\d{2}-\d-\d{3}-\d{2}-\d{2}\s+-\s+/m.test(text);
+
+  if (isComparativo) {
+    console.log('[parsearPDF] formato: Comparativo de Despesa x Receita');
     return parsearFormatoComparativo(text);
   }
+  console.log('[parsearPDF] formato: ranking/classificação');
   return parsearFormatoRanking(text);
 }
 
