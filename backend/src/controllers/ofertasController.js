@@ -301,37 +301,20 @@ async function parsearExcel(buffer) {
 }
 
 // Parser para "Comparativo de Despesa x Receita" (membrosweb)
-// Suporta dois layouts: valor na mesma linha OU em linhas separadas
+// pdf-parse renderiza: "{Receita}{Líquido} -  - {código} - {cidade}"
+// ex: "4.140,004.140,00 -  - 01-2-021-01-01 - CAMAPUÃ"
 function parsearFormatoComparativo(text) {
-  const reCode = /^(\d{2}-\d-\d{3}-\d{2}-\d{2})\s+-\s+(.+)/;
-  const reValor = /(\d{1,3}(?:\.\d{3})*,\d{2})/;
+  // Captura: (Receita)(Líquido=igual) dashes código - cidade
+  const reLinhaData = /^(\d{1,3}(?:\.\d{3})*,\d{2})\d{1,3}(?:\.\d{3})*,\d{2}\s+-\s+-\s+\d{2}-\d-\d{3}-\d{2}-\d{2}\s+-\s+(.+)/;
   const linhas = [];
-  const textLines = text.split('\n').map(l => l.trim()).filter(Boolean);
-
-  for (let i = 0; i < textLines.length; i++) {
-    const m = textLines[i].match(reCode);
+  for (const linha of text.split('\n')) {
+    const trim = linha.trim();
+    const m = trim.match(reLinhaData);
     if (!m) continue;
-
-    let descricao = m[2].trim();
-    let valor = null;
-
-    // Caso 1: valor na mesma linha ("CAMAPUÃ 4.140,00 - ...")
-    const inlineM = descricao.match(/^(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})\b/);
-    if (inlineM) {
-      descricao = inlineM[1].trim();
-      valor = parsearValorBR(inlineM[2]);
-    } else {
-      // Caso 2: pdf-parse separou colunas — valor nas próximas linhas
-      for (let j = i + 1; j < Math.min(i + 6, textLines.length); j++) {
-        if (textLines[j].match(/^\d{2}-\d-\d{3}/)) break; // chegou na próxima cidade
-        const vm = textLines[j].match(reValor);
-        if (vm) { valor = parsearValorBR(vm[1]); break; }
-      }
-    }
-
-    if (!descricao || descricao.length < 2 || !valor || valor <= 0) continue;
-    if (/total geral/i.test(descricao)) continue;
-    linhas.push({ nome: descricao, valor });
+    const valor = parsearValorBR(m[1]);
+    const nome = m[2].trim();
+    if (!nome || nome.length < 2 || !valor || valor <= 0) continue;
+    linhas.push({ nome, valor });
   }
   console.log(`[comparativo] ${linhas.length} cidades extraídas`);
   return linhas;
