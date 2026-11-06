@@ -211,4 +211,164 @@ async function upsert(req, res, next) {
   } catch (err) { next(err); }
 }
 
-module.exports = { list, getById, create, update, remove, resumo, pivotSetores, pivotCongregacoes, pivotCidades, upsert };
+// ── Importação de arquivo (Excel / PDF) ───────────────────────────────────────
+
+function normalizar(str) {
+  return String(str || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function similaridade(a, b) {
+  const na = normalizar(a), nb = normalizar(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  if (na.includes(nb) || nb.includes(na)) return 0.85;
+  const wa = na.split(' ').filter(Boolean);
+  const wb = new Set(nb.split(' ').filter(Boolean));
+  const intersect = wa.filter(w => wb.has(w)).length;
+  if (intersect === 0) return 0;
+  return intersect / Math.max(wa.length, wb.size);
+}
+
+function parsearValorBR(str) {
+  if (typeof str === 'number') return isNaN(str) ? null : str;
+  const s = String(str || '').trim().replace(/R\$\s*/g, '');
+  // "1.234,56" → 1234.56
+  const v = parseFloat(s.replace(/\./g, '').replace(',', '.'));
+  return isNaN(v) ? null : v;
+}
+
+async function parsearExcel(buffer) {
+  const xlsx = require('xlsx');
+  const wb = xlsx.read(buffer, { type: 'buffer' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = xlsx.utils.sheet_to_json(sheet, { defval: '' });
+  const linhas = [];
+  for (const row of rows) {
+    const cols = Object.keys(row);
+    // Heurística: a coluna "nome/congregação" é texto, a coluna "valor" é número/moeda
+    let nome = null, valor = null;
+    for (const col of cols) {
+      const v = row[col];
+      const colNorm = normalizar(col);
+      if (!nome && (colNorm.includes('nome') || colNorm.includes('congreg') || colNorm.includes('igreja') || colNorm.includes('local'))) {
+        nome = String(v).trim();
+      }
+      if (!valor && (colNorm.includes('valor') || colNorm.includes('ofert') || colNorm.includes('total'))) {
+        valor = parsearValorBR(v);
+      }
+    }
+    // fallback: primeira coluna como nome, segunda como valor
+    if (!nome && cols.length >= 1) nome = String(row[cols[0]]).trim();
+    if (!valor && cols.length >= 2) valor = parsearValorBR(row[cols[1]]);
+    if (nome && valor !== null && valor > 0) linhas.push({ nome, valor });
+  }
+  return linhas;
+}
+
+async function parsearPDF(buffer) {
+  const pdfParse = require('pdf-parse');
+  const data = await pdfParse(buffer);
+  const lines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
+  const linhas = [];
+  // Padrão: "Nome da Congregação .... 1.234,56" ou "Nome R$ 1.234,56"
+  const reValor = /(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d+(?:,\d{2})?)$/;
+  for (const line of lines) {
+    const m = line.match(reValor);
+    if (!m) continue;
+    const valor = parsearValorBR(m[1]);
+    if (!valor || valor <= 0) continue;
+    const nome = line.slice(0, line.lastIndexOf(m[0])).replace(/\.{2,}/g, '').trim();
+    if (nome && nome.length >= 3) linhas.push({ nome, valor });
+  }
+  return linhas;
+}
+
+async function importarPreview(req, res, next) {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    const { mesReferencia, anoReferencia } = req.body;
+    if (!mesReferencia || !anoReferencia) return res.status(400).json({ error: 'Informe mês e ano de referência' });
+
+    const mime = req.file.mimetype;
+    const originalname = req.file.originalname.toLowerCase();
+    let linhasBruto = [];
+    if (mime.includes('spreadsheet') || mime.includes('excel') || originalname.endsWith('.xlsx') || originalname.endsWith('.xls') || originalname.endsWith('.csv')) {
+      linhasBruto = await parsearExcel(req.file.buffer);
+    } else if (mime.includes('pdf') || originalname.endsWith('.pdf')) {
+      linhasBruto = await parsearPDF(req.file.buffer);
+    } else {
+      return res.status(400).json({ error: 'Formato não suportado. Use Excel (.xlsx, .xls) ou PDF.' });
+    }
+
+    if (linhasBruto.length === 0) return res.status(422).json({ error: 'Nenhuma linha com nome+valor encontrada no arquivo.' });
+
+    const congregacoes = await prisma.congregacao.findMany({ include: { setor: true } });
+
+    const preview = linhasBruto.map((linha, idx) => {
+      let melhor = null, melhorScore = 0;
+      for (const cong of congregacoes) {
+        const score = similaridade(linha.nome, cong.nome);
+        if (score > melhorScore) { melhorScore = score; melhor = cong; }
+      }
+      const matched = melhorScore >= 0.5;
+      return {
+        idx,
+        nomeOriginal: linha.nome,
+        valor: linha.valor,
+        matched,
+        score: Math.round(melhorScore * 100),
+        congregacaoId: matched ? melhor.id : null,
+        congregacaoNome: matched ? melhor.nome : null,
+        setorNome: matched ? (melhor.setor?.nome || '—') : null,
+      };
+    });
+
+    res.json({
+      total: preview.length,
+      matched: preview.filter(r => r.matched).length,
+      preview,
+      mesReferencia: parseInt(mesReferencia),
+      anoReferencia: parseInt(anoReferencia),
+    });
+  } catch (err) { next(err); }
+}
+
+async function confirmarImportacao(req, res, next) {
+  try {
+    const { linhas, mesReferencia, anoReferencia } = req.body;
+    if (!linhas || !Array.isArray(linhas) || linhas.length === 0) return res.status(400).json({ error: 'Nenhuma linha para importar' });
+
+    const mes = parseInt(mesReferencia), ano = parseInt(anoReferencia);
+    let importados = 0, erros = [];
+
+    for (const l of linhas) {
+      if (!l.congregacaoId || !l.valor) continue;
+      try {
+        await prisma.ofertaMissionaria.upsert({
+          where: { congregacaoId_mesReferencia_anoReferencia: {
+            congregacaoId: parseInt(l.congregacaoId),
+            mesReferencia: mes,
+            anoReferencia: ano,
+          }},
+          update: { valor: parseFloat(l.valor) },
+          create: {
+            congregacaoId: parseInt(l.congregacaoId),
+            mesReferencia: mes,
+            anoReferencia: ano,
+            valor: parseFloat(l.valor),
+          },
+        });
+        importados++;
+      } catch (e) { erros.push({ congregacaoId: l.congregacaoId, erro: e.message }); }
+    }
+
+    res.json({ importados, erros });
+  } catch (err) { next(err); }
+}
+
+module.exports = { list, getById, create, update, remove, resumo, pivotSetores, pivotCongregacoes, pivotCidades, upsert, importarPreview, confirmarImportacao };

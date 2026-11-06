@@ -525,6 +525,7 @@ function TabInterior({ ano }) {
 function TabLancamentos({ ano }) {
   const [filtros, setFiltros] = useState({ mes: '', tipo: '', setorId: '', congregacaoId: '', page: 1 });
   const [modal, setModal] = useState(false);
+  const [modalImport, setModalImport] = useState(false);
   const [editRecord, setEditRecord] = useState(null);
   const qc = useQueryClient();
 
@@ -604,7 +605,10 @@ function TabLancamentos({ ano }) {
             {congregacoes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
         </div>
-        <Button onClick={openNew}>+ Novo Lançamento</Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setModalImport(true)}>⬆ Importar Arquivo</Button>
+          <Button onClick={openNew}>+ Novo Lançamento</Button>
+        </div>
       </div>
 
       {data && (
@@ -626,6 +630,9 @@ function TabLancamentos({ ano }) {
           </div>
         </div>
       )}
+
+      <ModalImportacao open={modalImport} onClose={() => setModalImport(false)} ano={ano}
+        onImportado={() => setFiltros(f => ({ ...f }))} />
 
       <Modal open={modal} onClose={() => setModal(false)} title={editRecord ? 'Editar Lançamento' : 'Novo Lançamento'}>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
@@ -672,6 +679,189 @@ function TabLancamentos({ ano }) {
         </form>
       </Modal>
     </div>
+  );
+}
+
+// ── Modal Importação de Arquivo ───────────────────────────────────────────────
+function ModalImportacao({ open, onClose, ano, onImportado }) {
+  const [arquivo, setArquivo]       = useState(null);
+  const [mes, setMes]               = useState(String(MES_ATUAL));
+  const [anoRef, setAnoRef]         = useState(String(ano));
+  const [carregando, setCarregando] = useState(false);
+  const [preview, setPreview]       = useState(null);
+  const [linhasEdit, setLinhasEdit] = useState([]);
+  const [confirmando, setConfirmando] = useState(false);
+  const { data: congregacoes = [] }  = useQuery({
+    queryKey: ['congregacoes-todas'],
+    queryFn: () => api.get('/congregacoes').then(r => r.data),
+  });
+  const qc = useQueryClient();
+
+  function resetar() {
+    setArquivo(null); setPreview(null); setLinhasEdit([]);
+  }
+
+  function handleClose() { resetar(); onClose(); }
+
+  async function enviarPreview() {
+    if (!arquivo) return toast.error('Selecione um arquivo');
+    const form = new FormData();
+    form.append('arquivo', arquivo);
+    form.append('mesReferencia', mes);
+    form.append('anoReferencia', anoRef);
+    setCarregando(true);
+    try {
+      const res = await api.post('/ofertas-missionarias/importar-preview', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setPreview(res.data);
+      setLinhasEdit(res.data.preview.map(r => ({ ...r, _skip: !r.matched })));
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'Erro ao processar arquivo');
+    } finally { setCarregando(false); }
+  }
+
+  function atualizarCong(idx, congregacaoId) {
+    setLinhasEdit(ls => ls.map((l, i) => {
+      if (i !== idx) return l;
+      const cong = congregacoes.find(c => String(c.id) === String(congregacaoId));
+      return { ...l, congregacaoId: cong?.id || null, congregacaoNome: cong?.nome || null, _skip: !cong };
+    }));
+  }
+
+  function toggleSkip(idx) {
+    setLinhasEdit(ls => ls.map((l, i) => i === idx ? { ...l, _skip: !l._skip } : l));
+  }
+
+  async function confirmar() {
+    const linhas = linhasEdit.filter(l => !l._skip && l.congregacaoId && l.valor > 0);
+    if (linhas.length === 0) return toast.error('Nenhuma linha selecionada para importar');
+    setConfirmando(true);
+    try {
+      const res = await api.post('/ofertas-missionarias/confirmar-importacao', {
+        linhas, mesReferencia: preview.mesReferencia, anoReferencia: preview.anoReferencia,
+      });
+      toast.success(`${res.data.importados} lançamento(s) importado(s)!`);
+      qc.invalidateQueries({ queryKey: ['ofertas'] });
+      qc.invalidateQueries(['pivot-setores']);
+      qc.invalidateQueries(['pivot-capital']);
+      qc.invalidateQueries(['pivot-interior']);
+      onImportado?.();
+      handleClose();
+    } catch (e) {
+      toast.error(e.response?.data?.error || e.message);
+    } finally { setConfirmando(false); }
+  }
+
+  if (!open) return null;
+  const linhasSelecionadas = linhasEdit.filter(l => !l._skip && l.congregacaoId).length;
+
+  return (
+    <Modal open={open} onClose={handleClose} title="Importar Ofertas por Arquivo">
+      <div className="space-y-4 min-w-[600px] max-w-full">
+        {!preview ? (
+          <>
+            <p className="text-sm text-gray-500">
+              Envie uma planilha Excel (<strong>.xlsx / .xls</strong>) ou PDF com colunas de congregação e valor.
+              O sistema fará a correspondência automática.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Mês de referência *</label>
+                <select value={mes} onChange={e => setMes(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  {MESES_L.slice(1).map((m, i) => <option key={i+1} value={i+1}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">Ano *</label>
+                <select value={anoRef} onChange={e => setAnoRef(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                  {anos.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">Arquivo (.xlsx, .xls, .pdf) *</label>
+              <input type="file" accept=".xlsx,.xls,.pdf,.csv"
+                onChange={e => setArquivo(e.target.files?.[0] || null)}
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            </div>
+            {arquivo && (
+              <p className="text-xs text-gray-400">Selecionado: <strong>{arquivo.name}</strong> ({(arquivo.size/1024).toFixed(1)} KB)</p>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="secondary" type="button" onClick={handleClose}>Cancelar</Button>
+              <Button onClick={enviarPreview} disabled={carregando || !arquivo}>
+                {carregando ? 'Processando...' : 'Analisar Arquivo'}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                <span className="font-semibold">{preview.total}</span> linhas encontradas —{' '}
+                <span className="text-green-600 font-semibold">{preview.matched}</span> correspondidas automaticamente,{' '}
+                <span className="text-orange-500 font-semibold">{preview.total - preview.matched}</span> sem correspondência.
+              </div>
+              <button onClick={resetar} className="text-xs text-blue-500 hover:underline">↩ Trocar arquivo</button>
+            </div>
+            <p className="text-xs text-gray-400">
+              Período: <strong>{MESES_L[preview.mesReferencia]} / {preview.anoReferencia}</strong>.
+              Revise as linhas, corrija as não encontradas e confirme a importação.
+            </p>
+            <div className="max-h-72 overflow-y-auto rounded-xl border border-gray-200">
+              <table className="w-full text-xs border-collapse">
+                <thead className="sticky top-0 bg-gray-50">
+                  <tr>
+                    <th className="px-2 py-2 text-left font-medium text-gray-500 w-6"><input type="checkbox" checked={linhasEdit.every(l => !l._skip)} onChange={e => setLinhasEdit(ls => ls.map(l => ({ ...l, _skip: !e.target.checked })))} /></th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-500">Nome no arquivo</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-500">Congregação correspondente</th>
+                    <th className="px-2 py-2 text-right font-medium text-gray-500">Valor</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhasEdit.map((l, idx) => (
+                    <tr key={idx} className={`border-t border-gray-100 ${l._skip ? 'opacity-40' : ''}`}>
+                      <td className="px-2 py-1.5">
+                        <input type="checkbox" checked={!l._skip} onChange={() => toggleSkip(idx)} />
+                      </td>
+                      <td className="px-2 py-1.5 max-w-[160px] truncate" title={l.nomeOriginal}>
+                        {l.nomeOriginal}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <select
+                          value={l.congregacaoId || ''}
+                          onChange={e => atualizarCong(idx, e.target.value)}
+                          className={`w-full text-xs border rounded px-1.5 py-1 ${l.congregacaoId ? 'border-green-300 bg-green-50' : 'border-orange-300 bg-orange-50'}`}>
+                          <option value="">— Selecionar —</option>
+                          {congregacoes.map(c => (
+                            <option key={c.id} value={c.id}>{c.nome}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1.5 text-right font-medium text-gray-700">
+                        {fmt(l.valor)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-xs text-gray-500">{linhasSelecionadas} linha(s) serão importadas</span>
+              <div className="flex gap-2">
+                <Button variant="secondary" type="button" onClick={handleClose}>Cancelar</Button>
+                <Button onClick={confirmar} disabled={confirmando || linhasSelecionadas === 0}>
+                  {confirmando ? 'Importando...' : `Confirmar Importação (${linhasSelecionadas})`}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   );
 }
 
