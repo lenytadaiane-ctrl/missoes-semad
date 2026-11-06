@@ -303,18 +303,42 @@ async function parsearExcel(buffer) {
 async function parsearPDF(buffer) {
   const pdfParse = require('pdf-parse');
   const data = await pdfParse(buffer);
-  const lines = data.text.split('\n').map(l => l.trim()).filter(Boolean);
+  const text = data.text;
+
+  // Estratégia: localiza TODOS os valores no texto e extrai o nome que vem antes de cada um.
+  // Funciona com layouts de 1 ou 2 colunas: cada valor é âncora, o texto entre o valor
+  // anterior e o atual contém rank (opcional) + setor (letra) + nome da congregação.
+  const reValorGlobal = /(\d{1,3}(?:\.\d{3})*,\d{2})/g;
+  const matches = [...text.matchAll(reValorGlobal)];
+
   const linhas = [];
-  // Padrão: "Nome da Congregação .... 1.234,56" ou "Nome R$ 1.234,56"
-  const reValor = /(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{2})?|\d+(?:,\d{2})?)$/;
-  for (const line of lines) {
-    const m = line.match(reValor);
-    if (!m) continue;
-    const valor = parsearValorBR(m[1]);
+  const cabecalhoRe = /class\.|setor|congreg|valor|capital|classifica|missionári|outubro|janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|novembro|dezembro/i;
+
+  for (let i = 0; i < matches.length; i++) {
+    const valor = parsearValorBR(matches[i][1]);
     if (!valor || valor <= 0) continue;
-    const nome = line.slice(0, line.lastIndexOf(m[0])).replace(/\.{2,}/g, '').trim();
-    if (nome && nome.length >= 3) linhas.push({ nome, valor });
+
+    // Pega o trecho de texto entre o fim do valor anterior e o início do valor atual
+    const prevEnd = i > 0 ? matches[i - 1].index + matches[i - 1][0].length : 0;
+    const segment = text.slice(prevEnd, matches[i].index).trim();
+
+    // Pega a última linha não-vazia do segmento (descarta cabeçalhos multilinhas)
+    const segLines = segment.split('\n').map(l => l.trim()).filter(Boolean);
+    if (segLines.length === 0) continue;
+    const lastLine = segLines[segLines.length - 1];
+
+    // Remove número de classificação (1–99) e código de setor (A, B, C-1, C-2 …)
+    const nome = lastLine
+      .replace(/^\d{1,3}\s+/, '')
+      .replace(/^[A-Z](?:-\d)?\s+/, '')
+      .trim();
+
+    if (!nome || nome.length < 3) continue;
+    if (cabecalhoRe.test(nome)) continue;
+
+    linhas.push({ nome, valor });
   }
+
   return linhas;
 }
 
