@@ -300,17 +300,28 @@ async function parsearExcel(buffer) {
   return linhas;
 }
 
-async function parsearPDF(buffer) {
-  const pdfParse = require('pdf-parse');
-  const data = await pdfParse(buffer);
-  const text = data.text;
+// Parser para "Comparativo de Despesa x Receita" (membrosweb)
+// Linhas: "01-2-021-01-01 - CAMAPUÃ 4.140,00 - 4.140,00 -"
+function parsearFormatoComparativo(text) {
+  const reLinhaData = /^\d{2}-\d-\d{3}-\d{2}-\d{2}\s+-\s+(.+?)\s+(\d{1,3}(?:\.\d{3})*,\d{2})/;
+  const linhas = [];
+  for (const linha of text.split('\n')) {
+    const trim = linha.trim();
+    if (!trim.match(/^\d{2}-\d-\d{3}/)) continue;
+    const m = trim.match(reLinhaData);
+    if (!m) continue;
+    const nome = m[1].trim();
+    const valor = parsearValorBR(m[2]);
+    if (!nome || nome.length < 2 || !valor || valor <= 0) continue;
+    linhas.push({ nome, valor });
+  }
+  return linhas;
+}
 
-  // Estratégia: localiza TODOS os valores no texto e extrai o nome que vem antes de cada um.
-  // Funciona com layouts de 1 ou 2 colunas: cada valor é âncora, o texto entre o valor
-  // anterior e o atual contém rank (opcional) + setor (letra) + nome da congregação.
+// Parser para ranking/classificação com 2 colunas (ex: OUTUBRO MISSÕES.pdf)
+function parsearFormatoRanking(text) {
   const reValorGlobal = /(\d{1,3}(?:\.\d{3})*,\d{2})/g;
   const matches = [...text.matchAll(reValorGlobal)];
-
   const linhas = [];
   const cabecalhoRe = /class\.|setor|congreg|valor|capital|classifica|missionári|outubro|janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|novembro|dezembro/i;
 
@@ -318,16 +329,13 @@ async function parsearPDF(buffer) {
     const valor = parsearValorBR(matches[i][1]);
     if (!valor || valor <= 0) continue;
 
-    // Pega o trecho de texto entre o fim do valor anterior e o início do valor atual
     const prevEnd = i > 0 ? matches[i - 1].index + matches[i - 1][0].length : 0;
     const segment = text.slice(prevEnd, matches[i].index).trim();
 
-    // Pega a última linha não-vazia do segmento (descarta cabeçalhos multilinhas)
     const segLines = segment.split('\n').map(l => l.trim()).filter(Boolean);
     if (segLines.length === 0) continue;
     const lastLine = segLines[segLines.length - 1];
 
-    // Remove número de classificação (1–99) e código de setor (A, B, C-1, C-2 …)
     const nome = lastLine
       .replace(/^\d{1,3}\s+/, '')
       .replace(/^[A-Z](?:-\d)?\s+/, '')
@@ -335,11 +343,20 @@ async function parsearPDF(buffer) {
 
     if (!nome || nome.length < 3) continue;
     if (cabecalhoRe.test(nome)) continue;
-
     linhas.push({ nome, valor });
   }
-
   return linhas;
+}
+
+async function parsearPDF(buffer) {
+  const pdfParse = require('pdf-parse');
+  const data = await pdfParse(buffer);
+  const text = data.text;
+
+  if (/Comparativo de Despesa x Receita/i.test(text)) {
+    return parsearFormatoComparativo(text);
+  }
+  return parsearFormatoRanking(text);
 }
 
 async function importarPreview(req, res, next) {
